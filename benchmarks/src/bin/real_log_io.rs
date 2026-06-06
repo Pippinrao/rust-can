@@ -28,22 +28,50 @@ impl Run {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    let asc_path = args
-        .get(1)
+    let assert_count = args.iter().any(|arg| arg == "--assert-count");
+    let positional: Vec<_> = args
+        .iter()
+        .skip(1)
+        .filter(|arg| *arg != "--assert-count")
+        .cloned()
+        .collect();
+
+    let asc_path = positional
+        .first()
         .map(PathBuf::from)
         .unwrap_or_else(default_asc_path);
-    let blf_path = args
-        .get(2)
+    let blf_path = positional
+        .get(1)
         .map(PathBuf::from)
         .unwrap_or_else(default_blf_path);
-    let asc_limit = args
-        .get(3)
+    let asc_limit = positional
+        .get(2)
         .and_then(|value| value.parse::<usize>().ok())
         .unwrap_or(100_000);
-    let runs = args
-        .get(4)
+    let runs = positional
+        .get(3)
         .and_then(|value| value.parse::<usize>().ok())
         .unwrap_or(5);
+
+    if assert_count {
+        let asc = run_asc(&asc_path, asc_limit).expect("ASC assert run should succeed");
+        let blf = run_blf(&blf_path).expect("BLF assert run should succeed");
+        assert_counts(&asc, &blf, asc_limit);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&json!({
+                "mode": "assert-count",
+                "asc_messages": asc.messages,
+                "asc_classic": asc.classic,
+                "asc_fd": asc.fd,
+                "blf_messages": blf.messages,
+                "blf_classic": blf.classic,
+                "blf_fd": blf.fd,
+            }))
+            .expect("JSON should serialize")
+        );
+        return;
+    }
 
     let asc_runs = (0..runs)
         .map(|_| run_asc(&asc_path, asc_limit))
@@ -136,6 +164,17 @@ fn min_mps(runs: &[Run]) -> f64 {
         .fold(f64::INFINITY, f64::min)
 }
 
+fn assert_counts(asc: &Run, blf: &Run, asc_limit: usize) {
+    assert!(asc.messages > 0, "ASC should contain messages");
+    assert!(asc.classic + asc.fd > 0, "ASC should contain CAN or CANFD frames");
+    assert!(
+        asc.messages <= asc_limit,
+        "ASC message count should respect limit"
+    );
+    assert!(blf.messages > 0, "BLF should contain messages");
+    assert!(blf.classic + blf.fd > 0, "BLF should contain CAN or CANFD frames");
+}
+
 fn default_blf_path() -> PathBuf {
     PathBuf::from("data/generated/real_can_canfd_10000.blf")
 }
@@ -169,7 +208,7 @@ mod tests {
     use std::fs::{self, File};
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use super::{collect_asc_files, mean_mps, min_mps, runs_to_json, Run};
+    use super::{assert_counts, collect_asc_files, mean_mps, min_mps, runs_to_json, Run};
 
     #[test]
     fn run_reports_messages_per_second() {
@@ -232,5 +271,24 @@ mod tests {
         assert!(files.iter().any(|path| path.ends_with("nested.asc")));
 
         fs::remove_dir_all(&root).expect("test directory should be removed");
+    }
+
+    #[test]
+    fn assert_counts_requires_nonzero_can_frames() {
+        let asc = Run {
+            seconds: 1.0,
+            messages: 100,
+            classic: 40,
+            fd: 60,
+            lin: 0,
+        };
+        let blf = Run {
+            seconds: 1.0,
+            messages: 10_000,
+            classic: 1_486,
+            fd: 8_514,
+            lin: 0,
+        };
+        assert_counts(&asc, &blf, 100_000);
     }
 }

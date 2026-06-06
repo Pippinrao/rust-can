@@ -55,7 +55,7 @@ pub mod message;
 pub mod protocol;
 
 // Re-exports for convenient access
-pub use bus::CanBus;
+pub use bus::{CanBus, FilteredBus};
 pub use error::{CanError, Result};
 pub use filter::{CanFilter, CanFilters};
 pub use frame::CanFrame;

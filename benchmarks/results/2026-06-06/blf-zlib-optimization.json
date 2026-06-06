@@ -1,0 +1,16 @@
+{
+  "scenario": "PERF-IO-003",
+  "fixture": "data/generated/real_can_canfd_100000.blf",
+  "runs": 5,
+  "before_optimization": {
+    "python_mean_mps": 580077,
+    "rust_mean_mps": 8616803,
+    "speedup": 14.85
+  },
+  "after_optimization": {
+    "python_mean_mps": 573005,
+    "rust_mean_mps": 10606543,
+    "speedup": 18.51
+  },
+  "date": "2026-06-06"
+}

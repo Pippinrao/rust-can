@@ -1,5 +1,7 @@
 # rust-can 架构设计
 
+[English summary](en/overview.md) · 模块设计：[details/](details/) · 测试报告：[../test/details/](../test/details/)
+
 本文档基于当前仓库源码和上游 `python-can` 源码分析编写。上游源码已拉取到 `.external/python-can`，分析基准提交为 `491a691fd1faffab1c48956bafd711e7c653db54`。
 
 ## 目标
@@ -24,7 +26,7 @@ rust-can 的目标不是简单移植 python-can，而是提供一个覆盖面更
 - P0 建立真实 ASC/BLF 同数据 benchmark。当前 Rust ASC 和无压缩 BLF IO 已达 20x+；python-can zlib 压缩 BLF 低于 20x，必须标记为性能异常。
 - 硬件后端实现延后；`rust-can-adapters` 当前只作为 adapter injection SPI、能力 metadata、mock/virtual conformance test 边界。
 
-详细计划见 [REAL_LOG_IO_ARCHITECTURE.md](REAL_LOG_IO_ARCHITECTURE.md)。
+详细计划见 [real-log-io.md](real-log-io.md)。English: [en/overview.md](en/overview.md)
 
 ## python-can 模块分析
 
@@ -61,7 +63,7 @@ python-can 当前内置后端包括 `socketcan`、`virtual`、`udp_multicast`、
 - `rust-can-ffi`: C FFI crate，目前导出版本信息。
 - `benchmarks`: Criterion benchmark、同数据 Rust/Python 对比 harness、pytest-benchmark Python 对照。当前消息/过滤微路径和真实 ASC/BLF IO 有实测；bus 对比待实现。
 
-完整 python-can API、IO、CLI、后端逐项对应见 [PYTHON_CAN_COMPATIBILITY.md](PYTHON_CAN_COMPATIBILITY.md)。
+完整 python-can API、IO、CLI、后端逐项对应见 [python-can-compatibility.md](python-can-compatibility.md)。
 
 建议新增或拆分：
 

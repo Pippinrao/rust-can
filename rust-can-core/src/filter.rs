@@ -187,4 +187,45 @@ mod tests {
         let msg2 = CanMessage::new(0x300, &[0x01], false).unwrap();
         assert!(!filters.matches(&msg2));
     }
+
+    #[test]
+    fn test_filter_extended_none_matches_both_frame_types() {
+        let filter = CanFilter::new(0x123, 0x7FF, None);
+        let std_msg = CanMessage::new(0x123, &[0x01], false).unwrap();
+        let ext_msg = CanMessage::new(0x123, &[0x01], true).unwrap();
+        assert!(filter.matches(&std_msg));
+        assert!(filter.matches(&ext_msg));
+    }
+
+    #[test]
+    fn test_filters_collection_api_and_from_conversions() {
+        let mut filters = CanFilters::new();
+        assert!(filters.is_empty());
+        assert_eq!(filters.len(), 0);
+
+        let filter = CanFilter::new(0x100, 0x700, Some(false));
+        filters.add(filter);
+        assert_eq!(filters.len(), 1);
+        assert!(!filters.is_empty());
+        assert_eq!(filters.as_slice().len(), 1);
+
+        let from_single: CanFilters = CanFilter::new(0x200, 0x7FF, None).into();
+        assert_eq!(from_single.len(), 1);
+        assert!(from_single.matches(&CanMessage::new(0x200, &[0x01], false).unwrap()));
+
+        let from_vec: CanFilters = vec![
+            CanFilter::new(0x300, 0x7FF, Some(false)),
+            CanFilter::new(0x400, 0x7FF, Some(false)),
+        ]
+        .into();
+        assert_eq!(from_vec.len(), 2);
+        assert!(from_vec.matches(&CanMessage::new(0x400, &[0x01], false).unwrap()));
+    }
+
+    #[test]
+    fn test_filter_standard_only_rejects_extended_id() {
+        let filter = CanFilter::new(0x18FF_0000, 0x1FFF_0000, Some(false));
+        let ext_msg = CanMessage::new(0x18FF_50E5, &[0x01], true).unwrap();
+        assert!(!filter.matches(&ext_msg));
+    }
 }

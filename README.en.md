@@ -55,9 +55,9 @@ Not implemented or not verified:
 - `rust-can-ffi`: target crate for C ABI exports; currently exports version information.
 - `benchmarks`: Criterion benchmarks, message/filter comparison, and real ASC/BLF IO comparison harness; bus comparison is incomplete.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full architecture, [docs/REAL_LOG_IO_ARCHITECTURE.md](docs/REAL_LOG_IO_ARCHITECTURE.md) for the real-log IO plan, and [docs/PYTHON_CAN_COMPATIBILITY.md](docs/PYTHON_CAN_COMPATIBILITY.md) for the python-can compatibility matrix.
+See [docs/design/](docs/design/) for design docs and [docs/test/](docs/test/) for test reports. Full architecture: [docs/design/en/overview.md](docs/design/en/overview.md). Real-log IO plan: [docs/design/real-log-io.md](docs/design/real-log-io.md). python-can compatibility matrix: [docs/design/python-can-compatibility.md](docs/design/python-can-compatibility.md). Per-module design: [docs/design/details/](docs/design/details/). Per-module test reports: [docs/test/details/](docs/test/details/).
 
-See [docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md) for the Git branch workflow: feature branches use `feature/* -> dev -> master`, and fixes use `bugfix/* -> dev -> master`.
+Git branch workflow is documented in [AGENTS.md](AGENTS.md#git-workflow).
 
 ## Real Log Data Status
 

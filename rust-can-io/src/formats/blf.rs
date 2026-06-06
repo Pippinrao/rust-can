@@ -91,6 +91,8 @@ pub struct BlfReader<R> {
     reader: R,
     start_timestamp_nanos: TimestampNanos,
     tail: Vec<u8>,
+    decompress_buf: Vec<u8>,
+    body_buf: Vec<u8>,
 }
 
 /// Aggregate counts from a CAN/CAN FD BLF scan.
@@ -260,7 +262,24 @@ impl<R: Read> BlfReader<R> {
             reader,
             start_timestamp_nanos,
             tail: Vec::new(),
+            decompress_buf: Vec::new(),
+            body_buf: Vec::new(),
         })
+    }
+
+    fn read_object_body(&mut self, body_len: usize) -> Result<(), BlfParseError> {
+        self.body_buf.resize(body_len, 0);
+        self.reader.read_exact(&mut self.body_buf)?;
+        Ok(())
+    }
+
+    fn read_object_padding(&mut self, padding: usize) -> Result<(), BlfParseError> {
+        if padding == 0 {
+            return Ok(());
+        }
+        let mut padding_buf = [0_u8; 3];
+        self.reader.read_exact(&mut padding_buf[..padding])?;
+        Ok(())
     }
 
     /// Read the remaining BLF stream into decoded log events.
@@ -281,8 +300,7 @@ impl<R: Read> BlfReader<R> {
                     value: header.object_size.to_string(),
                 },
             )?;
-            let mut body = vec![0_u8; body_len];
-            self.reader.read_exact(&mut body)?;
+            self.read_object_body(body_len)?;
 
             let padding = header.object_size % 4;
             if padding != 0 {
@@ -291,8 +309,13 @@ impl<R: Read> BlfReader<R> {
             }
 
             if header.object_type == LOG_CONTAINER {
-                let data = decode_container(&body)?;
-                events.extend(self.parse_container(&data)?);
+                let chunk = parse_log_container(
+                    &self.body_buf,
+                    self.start_timestamp_nanos,
+                    &mut self.tail,
+                    &mut self.decompress_buf,
+                )?;
+                events.extend(chunk);
             }
         }
         Ok(events)
@@ -316,60 +339,145 @@ impl<R: Read> BlfReader<R> {
                     value: header.object_size.to_string(),
                 },
             )?;
-            let mut body = vec![0_u8; body_len];
-            self.reader.read_exact(&mut body)?;
+            self.read_object_body(body_len)?;
 
             let padding = header.object_size % 4;
-            if padding != 0 {
-                let mut padding_buf = [0_u8; 3];
-                self.reader.read_exact(&mut padding_buf[..padding])?;
-            }
+            self.read_object_padding(padding)?;
 
             if header.object_type == LOG_CONTAINER {
-                let data = decode_container(&body)?;
-                self.scan_container(&data, &mut stats)?;
+                scan_log_container(
+                    &self.body_buf,
+                    self.start_timestamp_nanos,
+                    &mut self.tail,
+                    &mut self.decompress_buf,
+                    &mut stats,
+                )?;
             }
         }
         Ok(stats)
     }
 
-    fn parse_container(&mut self, data: &[u8]) -> Result<Vec<LogEvent>, BlfParseError> {
-        let mut buffer;
-        let parse_data = if self.tail.is_empty() {
-            data
-        } else {
-            buffer = Vec::with_capacity(self.tail.len() + data.len());
-            buffer.extend_from_slice(&self.tail);
-            buffer.extend_from_slice(data);
-            &buffer
-        };
+}
 
-        let (events, consumed) = parse_objects(parse_data, self.start_timestamp_nanos)?;
-        self.tail.clear();
-        self.tail.extend_from_slice(&parse_data[consumed..]);
-        Ok(events)
+fn parse_log_container(
+    body: &[u8],
+    start_timestamp_nanos: TimestampNanos,
+    tail: &mut Vec<u8>,
+    decompress_buf: &mut Vec<u8>,
+) -> Result<Vec<LogEvent>, BlfParseError> {
+    if body.len() < LOG_CONTAINER_STRUCT_SIZE {
+        return Err(BlfParseError::Truncated {
+            context: "log container",
+        });
     }
-
-    fn scan_container(
-        &mut self,
-        data: &[u8],
-        stats: &mut BlfCanStats,
-    ) -> Result<(), BlfParseError> {
-        let mut buffer;
-        let parse_data = if self.tail.is_empty() {
-            data
-        } else {
-            buffer = Vec::with_capacity(self.tail.len() + data.len());
-            buffer.extend_from_slice(&self.tail);
-            buffer.extend_from_slice(data);
-            &buffer
-        };
-
-        let consumed = scan_objects(parse_data, self.start_timestamp_nanos, stats)?;
-        self.tail.clear();
-        self.tail.extend_from_slice(&parse_data[consumed..]);
-        Ok(())
+    let method = read_u16(body, 0)?;
+    match method {
+        NO_COMPRESSION => {
+            parse_container_with_tail(&body[LOG_CONTAINER_STRUCT_SIZE..], start_timestamp_nanos, tail)
+        }
+        ZLIB_DEFLATE => {
+            decompress_container(body, decompress_buf)?;
+            let data = decompress_buf.as_slice();
+            parse_container_with_tail(data, start_timestamp_nanos, tail)
+        }
+        _ => Err(BlfParseError::InvalidField {
+            field: "compression method",
+            value: method.to_string(),
+        }),
     }
+}
+
+fn scan_log_container(
+    body: &[u8],
+    start_timestamp_nanos: TimestampNanos,
+    tail: &mut Vec<u8>,
+    decompress_buf: &mut Vec<u8>,
+    stats: &mut BlfCanStats,
+) -> Result<(), BlfParseError> {
+    if body.len() < LOG_CONTAINER_STRUCT_SIZE {
+        return Err(BlfParseError::Truncated {
+            context: "log container",
+        });
+    }
+    let method = read_u16(body, 0)?;
+    match method {
+        NO_COMPRESSION => scan_container_with_tail(
+            &body[LOG_CONTAINER_STRUCT_SIZE..],
+            start_timestamp_nanos,
+            tail,
+            stats,
+        ),
+        ZLIB_DEFLATE => {
+            decompress_container(body, decompress_buf)?;
+            let data = decompress_buf.as_slice();
+            scan_container_with_tail(data, start_timestamp_nanos, tail, stats)
+        }
+        _ => Err(BlfParseError::InvalidField {
+            field: "compression method",
+            value: method.to_string(),
+        }),
+    }
+}
+
+fn decompress_container(body: &[u8], decompress_buf: &mut Vec<u8>) -> Result<(), BlfParseError> {
+    let container_data = &body[LOG_CONTAINER_STRUCT_SIZE..];
+    let uncompressed_size = read_u32(body, 8)? as usize;
+    decompress_buf.clear();
+    decompress_buf
+        .try_reserve(uncompressed_size.min(MAX_CONTAINER_SIZE))
+        .map_err(|error| BlfParseError::Io(io::Error::other(error)))?;
+    if uncompressed_size > 0 {
+        decompress_buf.resize(uncompressed_size, 0);
+        let mut decoder = ZlibDecoder::new(container_data);
+        decoder.read_exact(decompress_buf)?;
+    } else {
+        let mut decoder = ZlibDecoder::new(container_data);
+        decoder.read_to_end(decompress_buf)?;
+    }
+    Ok(())
+}
+
+fn parse_container_with_tail(
+    data: &[u8],
+    start_timestamp_nanos: TimestampNanos,
+    tail: &mut Vec<u8>,
+) -> Result<Vec<LogEvent>, BlfParseError> {
+    let mut buffer;
+    let parse_data = if tail.is_empty() {
+        data
+    } else {
+        buffer = Vec::with_capacity(tail.len() + data.len());
+        buffer.extend_from_slice(tail);
+        buffer.extend_from_slice(data);
+        &buffer
+    };
+
+    let (events, consumed) = parse_objects(parse_data, start_timestamp_nanos)?;
+    tail.clear();
+    tail.extend_from_slice(&parse_data[consumed..]);
+    Ok(events)
+}
+
+fn scan_container_with_tail(
+    data: &[u8],
+    start_timestamp_nanos: TimestampNanos,
+    tail: &mut Vec<u8>,
+    stats: &mut BlfCanStats,
+) -> Result<(), BlfParseError> {
+    let mut buffer;
+    let parse_data = if tail.is_empty() {
+        data
+    } else {
+        buffer = Vec::with_capacity(tail.len() + data.len());
+        buffer.extend_from_slice(tail);
+        buffer.extend_from_slice(data);
+        &buffer
+    };
+
+    let consumed = scan_objects(parse_data, start_timestamp_nanos, stats)?;
+    tail.clear();
+    tail.extend_from_slice(&parse_data[consumed..]);
+    Ok(())
 }
 
 #[derive(Debug)]
@@ -393,29 +501,6 @@ struct ScanObjectHeader {
     payload_offset: usize,
     next_offset: usize,
     object_type: u32,
-}
-
-fn decode_container(body: &[u8]) -> Result<Vec<u8>, BlfParseError> {
-    if body.len() < LOG_CONTAINER_STRUCT_SIZE {
-        return Err(BlfParseError::Truncated {
-            context: "log container",
-        });
-    }
-    let method = read_u16(body, 0)?;
-    let container_data = &body[LOG_CONTAINER_STRUCT_SIZE..];
-    match method {
-        NO_COMPRESSION => Ok(container_data.to_vec()),
-        ZLIB_DEFLATE => {
-            let mut decoder = ZlibDecoder::new(container_data);
-            let mut decompressed = Vec::new();
-            decoder.read_to_end(&mut decompressed)?;
-            Ok(decompressed)
-        }
-        _ => Err(BlfParseError::InvalidField {
-            field: "compression method",
-            value: method.to_string(),
-        }),
-    }
 }
 
 fn parse_objects(

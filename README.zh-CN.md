@@ -55,9 +55,9 @@ rust-can 是一个早期 Rust CAN 工具链 workspace。当前重点是 ASC/BLF 
 - `rust-can-ffi`：C ABI 目标 crate；目前仅导出版本信息。
 - `benchmarks`：Criterion benchmark、消息/过滤对比、真实 ASC/BLF IO 对比 harness；bus 对比不完整。
 
-完整架构见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，真实日志 IO 计划见 [docs/REAL_LOG_IO_ARCHITECTURE.md](docs/REAL_LOG_IO_ARCHITECTURE.md)，python-can 功能矩阵见 [docs/PYTHON_CAN_COMPATIBILITY.md](docs/PYTHON_CAN_COMPATIBILITY.md)。
+设计文档见 [docs/design/](docs/design/)，测试报告见 [docs/test/](docs/test/)。完整架构见 [docs/design/overview.md](docs/design/overview.md)，真实日志 IO 计划见 [docs/design/real-log-io.md](docs/design/real-log-io.md)，python-can 功能矩阵见 [docs/design/python-can-compatibility.md](docs/design/python-can-compatibility.md)。各模块详细设计见 [docs/design/details/](docs/design/details/)，模块测试报告见 [docs/test/details/](docs/test/details/)。
 
-Git 分支工作流见 [docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md)：功能分支使用 `feature/* -> dev -> master`，修复分支使用 `bugfix/* -> dev -> master`。
+Git 分支工作流见 [AGENTS.md](AGENTS.md#git-工作流)。
 
 ## 真实日志数据状态
 

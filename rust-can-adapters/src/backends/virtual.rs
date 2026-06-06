@@ -1,12 +1,13 @@
 /// Virtual CAN bus adapter — no hardware required.
 use std::collections::HashMap;
 use std::sync::LazyLock;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use parking_lot::Mutex;
 use rust_can_core::error::{CanError, Result};
 use rust_can_core::filter::CanFilters;
 use rust_can_core::frame::CanFrame;
+use rust_can_core::message::CanMessage;
 
 use crate::adapter::CanAdapter;
 use crate::config::AdapterConfig;
@@ -76,13 +77,41 @@ impl CanAdapter for VirtualAdapter {
         if !*self.is_open.lock() {
             return Err(CanError::operation("Cannot read from a closed bus"));
         }
-        match timeout {
-            None => self.rx.recv().map_err(|e| CanError::operation(format!("recv error: {}", e))),
-            Some(dur) => self.rx.recv_timeout(dur).map_err(|e| match e {
-                crossbeam::channel::RecvTimeoutError::Timeout => CanError::timeout("recv timeout"),
-                crossbeam::channel::RecvTimeoutError::Disconnected => CanError::operation("channel disconnected"),
-            }),
+
+        let start = Instant::now();
+        loop {
+            let remaining = timeout.map(|duration| {
+                duration
+                    .checked_sub(start.elapsed())
+                    .unwrap_or(Duration::ZERO)
+            });
+            if matches!(remaining, Some(duration) if duration.is_zero()) {
+                return Err(CanError::timeout("recv timeout"));
+            }
+
+            let frame = match remaining {
+                None => self
+                    .rx
+                    .recv()
+                    .map_err(|error| CanError::operation(format!("recv error: {error}")))?,
+                Some(duration) => self.rx.recv_timeout(duration).map_err(|error| match error {
+                    crossbeam::channel::RecvTimeoutError::Timeout => CanError::timeout("recv timeout"),
+                    crossbeam::channel::RecvTimeoutError::Disconnected => {
+                        CanError::operation("channel disconnected")
+                    }
+                })?,
+            };
+
+            let message = CanMessage::from(frame.clone());
+            if self._filters.lock().matches(&message) {
+                return Ok(frame);
+            }
         }
+    }
+
+    fn apply_hardware_filters(&self, filters: &CanFilters) -> Result<()> {
+        *self._filters.lock() = filters.clone();
+        Ok(())
     }
 
     fn write_frame(&self, frame: &CanFrame, timeout: Option<Duration>) -> Result<()> {
@@ -146,6 +175,7 @@ impl Drop for VirtualAdapter {
 mod tests {
     use super::*;
     use bytes::Bytes;
+    use rust_can_core::filter::{CanFilter, CanFilters};
 
     #[test]
     fn test_virtual_send_recv() {
@@ -242,5 +272,35 @@ mod tests {
         assert_eq!(info.name, "virtual");
         assert!(info.supports_fd);
         assert!(info.supports_xl);
+    }
+
+    #[test]
+    fn apply_hardware_filters_skips_non_matching_frames_on_read() {
+        let mut sender_config =
+            AdapterConfig::with_interface_and_channel("virtual", "test-filter-read");
+        sender_config.set_bool("receive_own_messages", false);
+        let sender = VirtualAdapter::open(&sender_config).unwrap();
+
+        let mut receiver_config =
+            AdapterConfig::with_interface_and_channel("virtual", "test-filter-read");
+        receiver_config.set_bool("receive_own_messages", false);
+        let receiver = VirtualAdapter::open(&receiver_config).unwrap();
+
+        receiver
+            .apply_hardware_filters(&CanFilters::from(CanFilter::new(0x200, 0x7FF, Some(false))))
+            .unwrap();
+
+        sender
+            .write_frame(&CanFrame::new_data(0x100, Bytes::from_static(&[0x01]), false), None)
+            .unwrap();
+        sender
+            .write_frame(&CanFrame::new_data(0x200, Bytes::from_static(&[0x02]), false), None)
+            .unwrap();
+
+        let received = receiver
+            .read_frame(Some(Duration::from_millis(100)))
+            .unwrap();
+        assert_eq!(received.can_id, 0x200);
+        assert_eq!(&received.data[..], &[0x02]);
     }
 }

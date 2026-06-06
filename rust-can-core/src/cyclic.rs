@@ -100,3 +100,137 @@ impl TokioCyclicTask {
 impl Drop for TokioCyclicTask {
     fn drop(&mut self) { let _ = self.stop(); }
 }
+
+impl crate::bus::CyclicTask for TokioCyclicTask {
+    fn stop(&self) -> Result<()> {
+        TokioCyclicTask::stop(self)
+    }
+
+    fn modify(&self, modifier: &dyn Fn(&mut CanMessage)) -> Result<()> {
+        TokioCyclicTask::modify(self, modifier)
+    }
+
+    fn is_running(&self) -> bool {
+        TokioCyclicTask::is_running(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    use async_trait::async_trait;
+
+    use crate::bus::{CanBus, CyclicTask};
+    use crate::error::CanError;
+    use crate::protocol::CanProtocol;
+
+    use super::*;
+
+    struct CountingBus {
+        send_count: AtomicUsize,
+    }
+
+    #[async_trait]
+    impl CanBus for CountingBus {
+        async fn recv(&self, _timeout: Option<Duration>) -> Result<Option<CanMessage>> {
+            Ok(None)
+        }
+
+        async fn send(&self, _msg: &CanMessage, _timeout: Option<Duration>) -> Result<()> {
+            self.send_count.fetch_add(1, Ordering::Relaxed);
+            Ok(())
+        }
+
+        fn protocol(&self) -> CanProtocol {
+            CanProtocol::Can20
+        }
+
+        fn shutdown(&self) -> Result<()> {
+            Ok(())
+        }
+
+        async fn send_periodic(
+            &self,
+            _msgs: &[CanMessage],
+            _period: Duration,
+            _duration: Option<Duration>,
+        ) -> Result<Box<dyn CyclicTask>> {
+            Err(CanError::not_supported("send_periodic", "counting bus"))
+        }
+    }
+
+    #[tokio::test]
+    async fn start_stop_and_is_running() {
+        let bus = Arc::new(CountingBus {
+            send_count: AtomicUsize::new(0),
+        }) as Arc<dyn CanBus>;
+        let task = TokioCyclicTask::new(
+            bus,
+            vec![CanMessage::new(0x123, &[0x01], false).unwrap()],
+            Duration::from_millis(5),
+        );
+
+        assert!(!task.is_running());
+        task.start().unwrap();
+        assert!(task.is_running());
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        task.stop().unwrap();
+        assert!(!task.is_running());
+    }
+
+    #[tokio::test]
+    async fn modify_updates_payload_before_send() {
+        let counting = Arc::new(CountingBus {
+            send_count: AtomicUsize::new(0),
+        });
+        let bus = counting.clone() as Arc<dyn CanBus>;
+        let task = TokioCyclicTask::new(
+            bus,
+            vec![CanMessage::new(0x123, &[0x01], false).unwrap()],
+            Duration::from_millis(5),
+        );
+        task.start().unwrap();
+        task.modify(&|msg| {
+            msg.data_mut()[0] = 0xAA;
+        })
+        .unwrap();
+        tokio::time::sleep(Duration::from_millis(25)).await;
+        task.stop().unwrap();
+        assert!(counting.send_count.load(Ordering::Relaxed) >= 1);
+    }
+
+    #[tokio::test]
+    async fn drop_stops_running_task() {
+        let bus = Arc::new(CountingBus {
+            send_count: AtomicUsize::new(0),
+        }) as Arc<dyn CanBus>;
+        let task = TokioCyclicTask::new(
+            bus,
+            vec![CanMessage::new(0x123, &[0x01], false).unwrap()],
+            Duration::from_millis(5),
+        );
+        task.start().unwrap();
+        assert!(task.is_running());
+        drop(task);
+    }
+
+    #[tokio::test]
+    async fn cyclic_task_trait_delegates_to_impl() {
+        let bus = Arc::new(CountingBus {
+            send_count: AtomicUsize::new(0),
+        }) as Arc<dyn CanBus>;
+        let task = TokioCyclicTask::new(
+            bus,
+            vec![CanMessage::new(0x123, &[0x01], false).unwrap()],
+            Duration::from_millis(5),
+        );
+        let cyclic: &dyn CyclicTask = &task;
+        assert!(!cyclic.is_running());
+        task.start().unwrap();
+        assert!(cyclic.is_running());
+        cyclic.stop().unwrap();
+        assert!(!cyclic.is_running());
+    }
+}

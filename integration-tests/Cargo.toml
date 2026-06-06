@@ -1,0 +1,20 @@
+[package]
+name = "rust-can-integration-tests"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Cross-crate E2E integration tests for rust-can"
+
+[dev-dependencies]
+rust-can-core = { path = "../rust-can-core" }
+rust-can-adapters = { path = "../rust-can-adapters" }
+rust-can-io = { path = "../rust-can-io" }
+rust-can-notifier = { path = "../rust-can-notifier" }
+async-trait.workspace = true
+bytes.workspace = true
+parking_lot.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

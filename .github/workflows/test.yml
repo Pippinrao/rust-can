@@ -1,0 +1,67 @@
+name: Test
+
+on:
+  push:
+    branches: [master, dev]
+  pull_request:
+    branches: [master, dev]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+
+      - name: Run workspace tests
+        run: cargo test --workspace --all-features
+
+      - name: Run integration tests explicitly
+        run: cargo test -p rust-can-integration-tests --all-features
+
+      - name: Run llvm-cov with 80% line gate
+        run: cargo llvm-cov --workspace --all-features --fail-under-lines 80
+
+      - name: Clippy (warnings denied)
+        run: cargo clippy --workspace --all-features -- -D warnings
+        continue-on-error: true
+
+  benchmark-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Rust perf_compare smoke
+        run: cargo run --release -p rust-can-benchmarks --bin perf_compare -- 100000
+
+      - name: Python perf_compare smoke
+        run: python benchmarks/python/perf_compare.py 100000
+
+      - name: Rust virtual_perf_compare smoke
+        run: cargo run --release -p rust-can-benchmarks --bin virtual_perf_compare -- 10000
+
+      - name: Python virtual_io smoke
+        run: python benchmarks/python/virtual_io.py 10000

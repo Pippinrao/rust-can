@@ -750,10 +750,13 @@ dependencies = [
 name = "rust-can-benchmarks"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
+ "bytes",
  "criterion",
  "rust-can-adapters",
  "rust-can-core",
  "rust-can-io",
+ "rust-can-notifier",
  "serde_json",
  "tokio",
 ]
@@ -792,6 +795,20 @@ name = "rust-can-ffi"
 version = "0.1.0"
 dependencies = [
  "rust-can-core",
+]
+
+[[package]]
+name = "rust-can-integration-tests"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "parking_lot",
+ "rust-can-adapters",
+ "rust-can-core",
+ "rust-can-io",
+ "rust-can-notifier",
+ "tokio",
 ]
 
 [[package]]

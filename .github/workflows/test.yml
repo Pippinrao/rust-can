@@ -54,6 +54,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install python-can
+        run: pip install python-can
+
       - name: Rust perf_compare smoke
         run: cargo run --release -p rust-can-benchmarks --bin perf_compare -- 100000
 

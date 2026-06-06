@@ -1,0 +1,4 @@
+    Checking rust-can-io v0.1.0 (<repo>\rust-can-io)
+    Checking rust-can-benchmarks v0.1.0 (<repo>\benchmarks)
+    Checking rust-can-cli v0.1.0 (<repo>\rust-can-cli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.80s

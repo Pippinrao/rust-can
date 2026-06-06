@@ -1,0 +1,19 @@
+[package]
+name = "rust-can-io"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "CAN bus log format readers and writers (ASC, BLF, TRC, CSV, etc.)"
+
+[dependencies]
+rust-can-core = { path = "../rust-can-core" }
+thiserror.workspace = true
+serde.workspace = true
+bytes.workspace = true
+nom.workspace = true
+flate2.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

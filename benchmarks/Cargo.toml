@@ -1,0 +1,31 @@
+[package]
+name = "rust-can-benchmarks"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+description = "Performance benchmarks for rust-can"
+
+[lib]
+path = "src/lib.rs"
+
+[[bench]]
+name = "message_bench"
+harness = false
+
+[[bench]]
+name = "bus_bench"
+harness = false
+
+[dependencies]
+rust-can-core = { path = "../rust-can-core" }
+rust-can-adapters = { path = "../rust-can-adapters" }
+rust-can-io = { path = "../rust-can-io" }
+tokio.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+
+[lints]
+workspace = true

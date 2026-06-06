@@ -1,0 +1,27 @@
+# Rust build artifacts
+/target/
+
+# Local benchmark and test caches
+/.benchmarks/
+/.pytest_cache/
+__pycache__/
+*.py[cod]
+
+# Local agent/tool state
+/.claude/
+
+# External checkouts are reproducible from their documented upstreams
+/.external/
+
+# Large real-log corpora and generated fixtures are kept out of git
+/data/*.zip
+/data/extracted/
+/data/generated/
+
+# Runtime/editor noise
+*.tmp
+*.log
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

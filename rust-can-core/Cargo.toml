@@ -1,0 +1,24 @@
+[package]
+name = "rust-can-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Core abstractions for CAN bus communication in Rust"
+
+[dependencies]
+bytes.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+async-trait.workspace = true
+tracing.workspace = true
+tokio = { workspace = true, optional = true }
+crossbeam.workspace = true
+parking_lot.workspace = true
+
+[features]
+default = ["tokio"]
+tokio-dep = ["tokio"]
+
+[lints]
+workspace = true

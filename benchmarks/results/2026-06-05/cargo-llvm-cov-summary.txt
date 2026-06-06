@@ -1,0 +1,169 @@
+info: cargo-llvm-cov currently setting cfg(coverage); you can opt-out it by passing --no-cfg-coverage
+   Compiling rust-can-core v0.1.0 (<repo>\rust-can-core)
+   Compiling rust-can-adapters v0.1.0 (<repo>\rust-can-adapters)
+   Compiling rust-can-io v0.1.0 (<repo>\rust-can-io)
+   Compiling rust-can-notifier v0.1.0 (<repo>\rust-can-notifier)
+   Compiling rust-can-benchmarks v0.1.0 (<repo>\benchmarks)
+   Compiling rust-can-ffi v0.1.0 (<repo>\rust-can-ffi)
+   Compiling rust-can-cli v0.1.0 (<repo>\rust-can-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.67s
+     Running unittests src\lib.rs (target\llvm-cov-target\debug\deps\rust_can_adapters-8c13d62adec95643.exe)
+
+running 12 tests
+test adapter::tests::adapter_defaults_are_safe_noop_or_not_supported ... ok
+test config::tests::config_builders_and_typed_accessors_roundtrip_values ... ok
+test config::tests::config_deserializes_flat_json_options ... ok
+test registry::tests::adapter_info_builders_set_capabilities ... ok
+test registry::tests::registry_lists_and_finds_inserted_adapter ... ok
+test backends::r#virtual::tests::preserve_timestamps_keeps_nonzero_source_timestamp ... ok
+test backends::r#virtual::tests::info_reports_virtual_capabilities ... ok
+test backends::r#virtual::tests::bounded_queue_reports_delivery_failure_when_receiver_is_full ... ok
+test backends::r#virtual::tests::test_receive_own_messages ... ok
+test backends::r#virtual::tests::test_virtual_send_recv ... ok
+test backends::r#virtual::tests::test_multiple_receivers ... ok
+test backends::r#virtual::tests::read_timeout_and_close_errors_are_reported ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src\lib.rs (target\llvm-cov-target\debug\deps\rust_can_benchmarks-85bfe16734b3317a.exe)
+
+running 1 test
+test tests::computes_items_per_second ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\bin\perf_compare.rs (target\llvm-cov-target\debug\deps\perf_compare-ead68a5b9209a99c.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\bin\real_log_io.rs (target\llvm-cov-target\debug\deps\real_log_io-26b5d9a65d0b6ff1.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\main.rs (target\llvm-cov-target\debug\deps\cancli-e5d496406498b295.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\llvm-cov-target\debug\deps\rust_can_core-8c2ad3bc56fb06be.exe)
+
+running 42 tests
+test bit_timing::tests::fd_timing_reports_nominal_and_data_bitrates ... ok
+test bit_timing::tests::standard_presets_include_common_rates ... ok
+test bit_timing::tests::rejects_out_of_range_timing_parameters ... ok
+test bit_timing::tests::sample_point_search_rejects_invalid_inputs_and_unreachable_rates ... ok
+test bit_timing::tests::from_bitrate_and_segments_rejects_impossible_prescaler ... ok
+test bit_timing::tests::test_from_registers ... ok
+test bit_timing::tests::test_from_sample_point ... ok
+test frame::tests::fd_xl_remote_and_channel_builders_set_expected_fields ... ok
+test listener::tests::printer_listener_accepts_empty_and_prefixed_output_paths ... ok
+test error::tests::io_errors_are_wrapped ... ok
+test message::tests::can_xl_keeps_full_payload_and_rejects_oversized_data ... ok
+test message::tests::data_mut_updates_effective_payload_only ... ok
+test filter::tests::test_filter_exact_match ... ok
+test bit_timing::tests::test_bitrate_calculation ... ok
+test filter::tests::test_filter_no_match ... ok
+test message::tests::test_can_fd_message ... ok
+test filter::tests::test_filters_or_semantics ... ok
+test frame::tests::conversion_truncates_wire_frame_payload_to_inline_message_capacity ... ok
+test bit_timing::tests::test_register_conversion ... ok
+test bit_timing::tests::test_validation_sjw_le_tseg2 ... ok
+test listener::tests::stopped_reader_drains_already_buffered_messages_without_blocking ... ok
+test listener::tests::test_buffered_reader_basic ... ok
+test listener::tests::test_buffered_reader_stop ... ok
+test filter::tests::test_empty_filters_matches_all ... ok
+test message::tests::protocol_tracks_classic_fd_and_xl_flags ... ok
+test message::tests::test_error_frame ... ok
+test message::tests::test_flag_setters ... ok
+test filter::tests::test_filter_extended_check ... ok
+test filter::tests::test_filter_with_mask ... ok
+test frame::tests::frame_flags_pack_and_unpack_all_bits ... ok
+test error::tests::constructors_format_user_visible_messages ... ok
+test message::tests::test_display_format ... ok
+test message::tests::test_validation_extended_id_range ... ok
+test message::tests::setters_toggle_fd_specific_flags_and_channel ... ok
+test message::tests::test_can20_message ... ok
+test message::tests::test_validation_fd_flags_on_non_fd ... ok
+test message::tests::test_remote_frame ... ok
+test frame::tests::test_frame_to_message_roundtrip ... ok
+test message::tests::test_validation_can20_max_dlc ... ok
+test message::tests::validation_rejects_conflicting_flags_and_standard_id_overflow ... ok
+test protocol::tests::protocol_capabilities_match_payload_limits ... ok
+test listener::tests::buffered_reader_waits_with_timeout_until_message_arrives ... ok
+
+test result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src\lib.rs (target\llvm-cov-target\debug\deps\rust_can_ffi-fa324a174b603437.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\lib.rs (target\llvm-cov-target\debug\deps\rust_can_io-62dbcfda8517b754.exe)
+
+running 21 tests
+test event::tests::unknown_event_preserves_raw_line_for_future_formats ... ok
+test event::tests::can_event_keeps_classic_fields ... ok
+test formats::asc::tests::keeps_unknown_event_for_future_formats ... ok
+test formats::asc::tests::parses_current_canfd_dialect_with_decimal_dlc_code ... ok
+test formats::asc::tests::collect_events_limit_stops_after_requested_count ... ok
+test event::tests::lin_event_is_not_forced_into_can_message ... ok
+test formats::blf::tests::systemtime_header_converts_to_unix_timestamp_nanos ... ok
+test reader::tests::detects_blf_from_magic ... ok
+test formats::asc::tests::writer_roundtrips_can_canfd_and_lin_events ... ok
+test reader::tests::rejects_unknown_extension ... ok
+test formats::asc::tests::numeric_can_channels_are_internal_zero_based_and_written_one_based ... ok
+test formats::asc::tests::collect_can_events_limit_ignores_lin_for_python_can_comparable_counts ... ok
+test formats::asc::tests::parses_lin_line_with_checksum ... ok
+test formats::asc::tests::streams_events_without_returning_header_lines ... ok
+test formats::asc::tests::count_can_events_limit_matches_comparable_frame_count_without_storage ... ok
+test event::tests::canfd_event_distinguishes_dlc_code_and_payload_length ... ok
+test formats::blf::tests::writer_roundtrips_can_and_canfd_events ... ok
+test reader::tests::detects_format_from_plain_and_compressed_extension ... ok
+test formats::asc::tests::parses_classic_can_data_line ... ok
+test formats::asc::tests::parses_smallest_real_asc_corpus_file ... ok
+test formats::blf::tests::reads_python_can_generated_real_blf_fixture ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src\lib.rs (target\llvm-cov-target\debug\deps\rust_can_notifier-64b91f92d974e7fd.exe)
+
+running 3 tests
+test tests::test_add_remove_listener ... ok
+test tests::notifier_adds_and_removes_listener_instances ... ok
+test tests::notifier_dispatches_messages_and_errors_to_listeners ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+Filename                                      Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      Missed Lines     Cover    Branches   Missed Branches     Cover
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+benchmarks\src\bin\perf_compare.rs                108               108     0.00%           9                 9     0.00%          67                67     0.00%           0                 0         -
+benchmarks\src\bin\real_log_io.rs                 224               224     0.00%          24                24     0.00%         149               149     0.00%           0                 0         -
+benchmarks\src\lib.rs                              15                 1    93.33%           3                 0   100.00%          12                 1    91.67%           0                 0         -
+rust-can-adapters\src\adapter.rs                   55                 4    92.73%           9                 1    88.89%          39                 3    92.31%           0                 0         -
+rust-can-adapters\src\backends\virtual.rs         359                18    94.99%          22                 4    81.82%         177                14    92.09%           0                 0         -
+rust-can-adapters\src\config.rs                   137                 2    98.54%          15                 0   100.00%          80                 2    97.50%           0                 0         -
+rust-can-adapters\src\registry.rs                  71                 0   100.00%          11                 0   100.00%          53                 0   100.00%           0                 0         -
+rust-can-cli\src\main.rs                            4                 4     0.00%           1                 1     0.00%           4                 4     0.00%           0                 0         -
+rust-can-core\src\bit_timing.rs                   339                10    97.05%          24                 0   100.00%         219                 3    98.63%           0                 0         -
+rust-can-core\src\bus.rs                           15                15     0.00%           5                 5     0.00%          18                18     0.00%           0                 0         -
+rust-can-core\src\cyclic.rs                        96                96     0.00%           7                 7     0.00%          62                62     0.00%           0                 0         -
+rust-can-core\src\error.rs                         44                 0   100.00%           7                 0   100.00%          29                 0   100.00%           0                 0         -
+rust-can-core\src\filter.rs                       153                22    85.62%          18                 6    66.67%          85                20    76.47%           0                 0         -
+rust-can-core\src\frame.rs                        164                 0   100.00%          14                 0   100.00%         149                 0   100.00%           0                 0         -
+rust-can-core\src\listener.rs                     149                11    92.62%          16                 3    81.25%          77                 3    96.10%           0                 0         -
+rust-can-core\src\message.rs                      565                89    84.25%          44                 4    90.91%         391                57    85.42%           0                 0         -
+rust-can-core\src\protocol.rs                      36                 1    97.22%           4                 0   100.00%          21                 0   100.00%           0                 0         -
+rust-can-ffi\src\lib.rs                             3                 3     0.00%           1                 1     0.00%           3                 3     0.00%           0                 0         -
+rust-can-io\src\event.rs                           70                 7    90.00%           9                 1    88.89%          80                 6    92.50%           0                 0         -
+rust-can-io\src\formats\asc.rs                    889               123    86.16%          65                 8    87.69%         502                61    87.85%           0                 0         -
+rust-can-io\src\formats\blf.rs                   1025               189    81.56%          48                 3    93.75%         590                94    84.07%           0                 0         -
+rust-can-io\src\reader.rs                          78                 7    91.03%          10                 1    90.00%          42                 4    90.48%           0                 0         -
+rust-can-notifier\src\lib.rs                      270                16    94.07%          26                 4    84.62%         165                14    91.52%           0                 0         -
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+TOTAL                                            4869               950    80.49%         392                82    79.08%        3014               585    80.59%           0                 0         -

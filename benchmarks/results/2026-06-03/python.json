@@ -1,0 +1,37 @@
+﻿{
+  "language": "python",
+  "python_can_commit": "491a691fd1faffab1c48956bafd711e7c653db54",
+  "iterations": 1000000,
+  "results": [
+    {
+      "name": "classic_message_create_8b",
+      "iterations": 1000000,
+      "total_ns": 362037600,
+      "ns_per_iter": 362.0376
+    },
+    {
+      "name": "fd_message_create_64b",
+      "iterations": 1000000,
+      "total_ns": 400237200,
+      "ns_per_iter": 400.2372
+    },
+    {
+      "name": "message_clone_8b",
+      "iterations": 1000000,
+      "total_ns": 594138600,
+      "ns_per_iter": 594.1386
+    },
+    {
+      "name": "message_validate_8b",
+      "iterations": 1000000,
+      "total_ns": 186935100,
+      "ns_per_iter": 186.9351
+    },
+    {
+      "name": "filter_match_4_filters",
+      "iterations": 1000000,
+      "total_ns": 212591700,
+      "ns_per_iter": 212.5917
+    }
+  ]
+}

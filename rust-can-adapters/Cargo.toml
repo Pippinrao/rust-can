@@ -1,0 +1,28 @@
+[package]
+name = "rust-can-adapters"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "CAN bus adapter implementations with open trait-based interface"
+
+[dependencies]
+rust-can-core = { path = "../rust-can-core" }
+async-trait.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+libloading = { workspace = true, optional = true }
+inventory.workspace = true
+parking_lot.workspace = true
+crossbeam.workspace = true
+bytes.workspace = true
+
+[features]
+default = ["virtual"]
+virtual = []
+dynamic-loading = ["libloading"]
+
+[lints]
+workspace = true

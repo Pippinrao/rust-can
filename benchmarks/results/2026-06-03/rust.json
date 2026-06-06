@@ -1,0 +1,11 @@
+﻿{
+  "language": "rust",
+  "iterations": 1000000,
+  "results": [
+    {"name":"classic_message_create_8b","iterations":1000000,"total_ns":9876200,"ns_per_iter":9.876},
+    {"name":"fd_message_create_64b","iterations":1000000,"total_ns":10713500,"ns_per_iter":10.713},
+    {"name":"message_clone_8b","iterations":1000000,"total_ns":1114500,"ns_per_iter":1.115},
+    {"name":"message_validate_8b","iterations":1000000,"total_ns":848000,"ns_per_iter":0.848},
+    {"name":"filter_match_4_filters","iterations":1000000,"total_ns":1791700,"ns_per_iter":1.792}
+  ]
+}

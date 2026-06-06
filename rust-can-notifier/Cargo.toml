@@ -1,0 +1,18 @@
+[package]
+name = "rust-can-notifier"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Async message dispatch engine for multi-bus multi-listener scenarios"
+
+[dependencies]
+rust-can-core = { path = "../rust-can-core" }
+tokio.workspace = true
+async-trait.workspace = true
+tracing.workspace = true
+parking_lot.workspace = true
+crossbeam.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,21 @@
+﻿Filename                                      Regions    Missed Regions     Cover   Functions  Missed Functions  Executed       Lines      Missed Lines     Cover    Branches   Missed Branches     Cover
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+benchmarks\src\bin\perf_compare.rs                107               107     0.00%           9                 9     0.00%          66                66     0.00%           0                 0         -
+rust-can-adapters\src\adapter.rs                    9                 9     0.00%           3                 3     0.00%          12                12     0.00%           0                 0         -
+rust-can-adapters\src\backends\virtual.rs         260                43    83.46%          18                 7    61.11%         129                31    75.97%           0                 0         -
+rust-can-adapters\src\config.rs                    75                34    54.67%          13                 6    53.85%          49                21    57.14%           0                 0         -
+rust-can-adapters\src\registry.rs                  36                36     0.00%           9                 9     0.00%          32                32     0.00%           0                 0         -
+rust-can-cli\src\main.rs                            4                 4     0.00%           1                 1     0.00%           4                 4     0.00%           0                 0         -
+rust-can-core\src\bit_timing.rs                   268                93    65.30%          19                 7    63.16%         190                69    63.68%           0                 0         -
+rust-can-core\src\bus.rs                           15                15     0.00%           5                 5     0.00%          18                18     0.00%           0                 0         -
+rust-can-core\src\cyclic.rs                        97                97     0.00%           7                 7     0.00%          63                63     0.00%           0                 0         -
+rust-can-core\src\error.rs                         17                14    17.65%           5                 4    20.00%          15                12    20.00%           0                 0         -
+rust-can-core\src\filter.rs                       154                23    85.06%          18                 6    66.67%          86                21    75.58%           0                 0         -
+rust-can-core\src\frame.rs                        111                28    74.77%          11                 4    63.64%         116                45    61.21%           0                 0         -
+rust-can-core\src\listener.rs                      92                35    61.96%          12                 6    50.00%          52                21    59.62%           0                 0         -
+rust-can-core\src\message.rs                      457               153    66.52%          39                12    69.23%         345               127    63.19%           0                 0         -
+rust-can-core\src\protocol.rs                      14                14     0.00%           3                 3     0.00%          12                12     0.00%           0                 0         -
+rust-can-ffi\src\lib.rs                             3                 3     0.00%           1                 1     0.00%           3                 3     0.00%           0                 0         -
+rust-can-notifier\src\lib.rs                      146               119    18.49%          12                10    16.67%          96                85    11.46%           0                 0         -
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+TOTAL                                            1865               827    55.66%         185               100    45.95%        1288               642    50.16%           0                 0         -

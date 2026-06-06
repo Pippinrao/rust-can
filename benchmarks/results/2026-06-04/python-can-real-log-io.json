@@ -1,0 +1,123 @@
+{
+  "date": "2026-06-04",
+  "python_can_source": ".external/python-can patched ASCReader for current CANFD dialect",
+  "asc_source": "data\\extracted\\CDC_VHR_LZ4CCAN_PRTO-M183 5.0.0.60M(C00E11R1P4log)_20260529091109(+0800)_20260529091332(+0800)_58143(parsed)\\CDC_VHR_LZ4CCAN_1_20260529091108_20260529091332(UTC+8)_58143.asc",
+  "blf_source": "data\\generated\\real_can_canfd_10000.blf",
+  "asc_limit": 100000,
+  "asc_runs": [
+    {
+      "seconds": 0.3635437000193633,
+      "messages": 100000,
+      "fd": 85245,
+      "classic": 14755,
+      "messages_per_second": 275070.09472224035
+    },
+    {
+      "seconds": 0.3581377000082284,
+      "messages": 100000,
+      "fd": 85245,
+      "classic": 14755,
+      "messages_per_second": 279222.2097749062
+    },
+    {
+      "seconds": 0.3545237999642268,
+      "messages": 100000,
+      "fd": 85245,
+      "classic": 14755,
+      "messages_per_second": 282068.50995642744
+    },
+    {
+      "seconds": 0.3567674999940209,
+      "messages": 100000,
+      "fd": 85245,
+      "classic": 14755,
+      "messages_per_second": 280294.58961838146
+    },
+    {
+      "seconds": 0.35406899999361485,
+      "messages": 100000,
+      "fd": 85245,
+      "classic": 14755,
+      "messages_per_second": 282430.8256351258
+    }
+  ],
+  "blf_runs": [
+    {
+      "seconds": 0.01838059996953234,
+      "messages": 10000,
+      "fd": 8514,
+      "classic": 1486,
+      "messages_per_second": 544051.8816891715
+    },
+    {
+      "seconds": 0.01748739997856319,
+      "messages": 10000,
+      "fd": 8514,
+      "classic": 1486,
+      "messages_per_second": 571840.2971429962
+    },
+    {
+      "seconds": 0.017513400001917034,
+      "messages": 10000,
+      "fd": 8514,
+      "classic": 1486,
+      "messages_per_second": 570991.3551283812
+    },
+    {
+      "seconds": 0.017484800016973168,
+      "messages": 10000,
+      "fd": 8514,
+      "classic": 1486,
+      "messages_per_second": 571925.3288737999
+    },
+    {
+      "seconds": 0.017414200003258884,
+      "messages": 10000,
+      "fd": 8514,
+      "classic": 1486,
+      "messages_per_second": 574244.0076563152
+    },
+    {
+      "seconds": 0.01741500000935048,
+      "messages": 10000,
+      "fd": 8514,
+      "classic": 1486,
+      "messages_per_second": 574217.6281728849
+    },
+    {
+      "seconds": 0.01729940000222996,
+      "messages": 10000,
+      "fd": 8514,
+      "classic": 1486,
+      "messages_per_second": 578054.730147344
+    },
+    {
+      "seconds": 0.017248099960852414,
+      "messages": 10000,
+      "fd": 8514,
+      "classic": 1486,
+      "messages_per_second": 579774.0054091031
+    },
+    {
+      "seconds": 0.017338600009679794,
+      "messages": 10000,
+      "fd": 8514,
+      "classic": 1486,
+      "messages_per_second": 576747.8339898953
+    },
+    {
+      "seconds": 0.017353400005958974,
+      "messages": 10000,
+      "fd": 8514,
+      "classic": 1486,
+      "messages_per_second": 576255.9496448019
+    }
+  ],
+  "summary": {
+    "asc_mean_messages_per_second": 279817.24594141624,
+    "asc_min_messages_per_second": 275070.09472224035,
+    "blf_mean_messages_per_second": 571810.3017854693,
+    "blf_min_messages_per_second": 544051.8816891715,
+    "rust_can_io_status": "superseded by 2026-06-05 rust-can real-log IO comparison; current rust-can ASC/BLF readers exist but remain below the 20x target"
+  }
+}

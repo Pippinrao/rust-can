@@ -1,0 +1,11 @@
+date=2026-06-03
+timezone=Asia/Shanghai
+os=Microsoft Windows 10.0.26200 
+arch=X64
+rustc=rustc 1.96.0 (ac68faa20 2026-05-25)
+cargo=cargo 1.96.0 (30a34c682 2026-05-25)
+python=Python 3.14.3
+python_can_commit=491a691fd1faffab1c48956bafd711e7c653db54
+cargo_llvm_cov=cargo-llvm-cov 0.8.7
+pyperf=2.10.0
+pytest_benchmark=5.2.3

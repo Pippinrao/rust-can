@@ -1,0 +1,25 @@
+[package]
+name = "rust-can-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Command-line tools for CAN bus operations"
+
+[[bin]]
+name = "cancli"
+path = "src/main.rs"
+
+[dependencies]
+rust-can-core = { path = "../rust-can-core" }
+rust-can-adapters = { path = "../rust-can-adapters" }
+rust-can-io = { path = "../rust-can-io" }
+rust-can-notifier = { path = "../rust-can-notifier" }
+tokio.workspace = true
+clap.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[lints]
+workspace = true

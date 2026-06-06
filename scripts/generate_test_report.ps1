@@ -15,6 +15,23 @@ $date = Get-Date -Format "yyyy-MM-dd"
 $rustcVersion = & $cargo --version 2>&1
 $llvmCovVersion = & $cargo llvm-cov --version 2>&1
 
+# Cargo prints absolute paths in compilation lines (e.g. "Compiling
+# <crate> v0.1.0 (<repo>/<crate>)"). Strip the workspace root from
+# generated reports so they don't leak machine-specific paths when the
+# reports are committed.
+$workspaceRoot = (Get-Location).ProviderPath
+function Format-CargoOutput {
+    param([string]$Raw)
+    if ([string]::IsNullOrEmpty($Raw)) { return $Raw }
+    return ($Raw -split "`r?`n" | ForEach-Object {
+        $line = $_
+        if ($workspaceRoot) {
+            $line = $line.Replace($workspaceRoot, "<repo>")
+        }
+        $line
+    }) -join "`n"
+}
+
 Write-Output "# rust-can-$Module 测试报告"
 Write-Output ""
 Write-Output "> 设计文档：[../../design/details/$Module.md](../../design/details/$Module.md)"
@@ -40,6 +57,7 @@ Write-Output "### 结果摘要"
 Write-Output ""
 
 $testOutput = & $cargo test -p $crate --all-features 2>&1 | Out-String
+$testOutput = Format-CargoOutput $testOutput
 Write-Output '```text'
 Write-Output $testOutput.TrimEnd()
 Write-Output '```'
@@ -53,6 +71,7 @@ Write-Output '```'
 Write-Output ""
 
 $covOutput = & $cargo llvm-cov -p $crate --all-features --summary-only 2>&1 | Out-String
+$covOutput = Format-CargoOutput $covOutput
 Write-Output '```text'
 Write-Output $covOutput.TrimEnd()
 Write-Output '```'

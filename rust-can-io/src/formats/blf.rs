@@ -1167,4 +1167,126 @@ mod tests {
             }
         );
     }
+
+    /// Exercise the ZLIB_DEFLATE decompression path without depending on a
+    /// real-corpus fixture. The BlfWriter produces an uncompressed log
+    /// container; we slice out the inner object buffer, recompress it with
+    /// flate2, and reassemble the BLF with method=ZLIB_DEFLATE so the
+    /// reader's decompress path runs end-to-end.
+    #[test]
+    fn roundtrips_events_through_zlib_compressed_container() {
+        use flate2::write::ZlibEncoder;
+        use flate2::Compression;
+        use std::io::Write as _;
+
+        const FILE_HEADER_SIZE: usize = 144;
+        const OBJ_HEADER_BASE_SIZE: usize = 16;
+        const LOG_CONTAINER_STRUCT_SIZE: usize = 16;
+        const LOG_CONTAINER_TYPE: u32 = 10;
+        const ZLIB_DEFLATE_METHOD: u16 = 2;
+
+        let can = LogEvent::Can(CanLogEvent {
+            timestamp_ns: 0,
+            channel: Channel::Number(0),
+            arbitration_id: 0x123,
+            direction: Direction::Rx,
+            extended_id: false,
+            remote_frame: false,
+            data: Payload::from_slice(&[1, 2, 3, 4]),
+        });
+        let canfd = LogEvent::CanFd(CanFdLogEvent {
+            timestamp_ns: 1_000,
+            channel: Channel::Number(1),
+            arbitration_id: 0x18ff_50e5,
+            direction: Direction::Tx,
+            extended_id: true,
+            bitrate_switch: true,
+            error_state_indicator: false,
+            dlc_code: 15,
+            data: Payload::from_slice(&[0xAA; 64]),
+        });
+
+        let mut uncompressed = Vec::new();
+        {
+            let cursor = Cursor::new(&mut uncompressed);
+            let mut writer = BlfWriter::new(cursor);
+            writer.write_event(&can).expect("write can");
+            writer.write_event(&canfd).expect("write canfd");
+            writer.finish().expect("finish");
+        }
+
+        // The BlfWriter layout is:
+        //   [file header: 144][base header: 16][container struct: 16][object buffer: N]
+        // The container struct's uncompressed_size field is at offset
+        //   144 + 16 + 2 (method) + 6 (padding) = 168, 4 bytes LE.
+        let size_offset = FILE_HEADER_SIZE + OBJ_HEADER_BASE_SIZE + 2 + 6;
+        let object_buffer_size = u32::from_le_bytes([
+            uncompressed[size_offset],
+            uncompressed[size_offset + 1],
+            uncompressed[size_offset + 2],
+            uncompressed[size_offset + 3],
+        ]) as usize;
+        let object_buffer_start =
+            FILE_HEADER_SIZE + OBJ_HEADER_BASE_SIZE + LOG_CONTAINER_STRUCT_SIZE;
+        let object_buffer =
+            &uncompressed[object_buffer_start..object_buffer_start + object_buffer_size];
+
+        let mut compressed = Vec::new();
+        {
+            let mut encoder = ZlibEncoder::new(&mut compressed, Compression::default());
+            encoder.write_all(object_buffer).expect("zlib write");
+            encoder.finish().expect("zlib finish");
+        }
+
+        // Build the new log container object: LOBJ header + ZLIB container struct + payload.
+        let mut new_object = Vec::with_capacity(
+            OBJ_HEADER_BASE_SIZE + LOG_CONTAINER_STRUCT_SIZE + compressed.len(),
+        );
+        new_object.extend_from_slice(b"LOBJ");
+        new_object.extend_from_slice(&(OBJ_HEADER_BASE_SIZE as u16).to_le_bytes());
+        new_object.extend_from_slice(&1_u16.to_le_bytes());
+        new_object.extend_from_slice(
+            &((OBJ_HEADER_BASE_SIZE + LOG_CONTAINER_STRUCT_SIZE + compressed.len()) as u32)
+                .to_le_bytes(),
+        );
+        new_object.extend_from_slice(&LOG_CONTAINER_TYPE.to_le_bytes());
+        new_object.extend_from_slice(&ZLIB_DEFLATE_METHOD.to_le_bytes());
+        new_object.extend_from_slice(&[0_u8; 6]);
+        new_object.extend_from_slice(&(object_buffer_size as u32).to_le_bytes());
+        new_object.extend_from_slice(&[0_u8; 4]);
+        new_object.extend_from_slice(&compressed);
+        let align_pad = (4 - new_object.len() % 4) % 4;
+        new_object.extend(std::iter::repeat_n(0_u8, align_pad));
+
+        // Build a minimal file header. Mirror write_file_header's layout so
+        // BlfReader accepts it.
+        let file_size = FILE_HEADER_SIZE + new_object.len();
+        let mut blf = Vec::with_capacity(file_size);
+        blf.extend_from_slice(b"LOGG");
+        blf.extend_from_slice(&(FILE_HEADER_SIZE as u32).to_le_bytes());
+        blf.extend_from_slice(&[5, 0, 0, 0, 2, 6, 8, 1]);
+        blf.extend_from_slice(&(file_size as u64).to_le_bytes());
+        blf.extend_from_slice(&(file_size as u64).to_le_bytes());
+        blf.extend_from_slice(&2_u32.to_le_bytes());
+        blf.extend_from_slice(&0_u32.to_le_bytes());
+        blf.extend(std::iter::repeat_n(0_u8, 32));
+        blf.resize(FILE_HEADER_SIZE, 0);
+        blf.extend_from_slice(&new_object);
+
+        let mut reader = BlfReader::new(Cursor::new(&blf)).expect("valid zlib BLF header");
+        let events = reader.collect_events().expect("zlib BLF should decode");
+        assert_eq!(events, vec![can, canfd]);
+
+        let mut reader = BlfReader::new(Cursor::new(&blf)).expect("valid zlib BLF header");
+        let stats = reader.scan_can_stats().expect("zlib scan should work");
+        assert_eq!(
+            stats,
+            BlfCanStats {
+                messages: 2,
+                classic: 1,
+                fd: 1,
+                payload_bytes: 4 + 64,
+            }
+        );
+    }
 }

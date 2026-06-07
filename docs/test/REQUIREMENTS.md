@@ -10,8 +10,8 @@
 
 | 规则 ID | 要求 | 度量方式 |
 | --- | --- | --- |
-| UT-01 | workspace 行覆盖率 ≥ **75%** | `cargo llvm-cov --workspace --all-features --fail-under-lines 75` |
-| UT-02 | 含业务逻辑的 crate（core/adapters/io/notifier）行覆盖率 ≥ **75%** | `cargo llvm-cov -p <crate> --summary-only` |
+| UT-01 | workspace 行覆盖率 ≥ **80%** | `cargo llvm-cov --workspace --all-features --fail-under-lines 80` |
+| UT-02 | 含业务逻辑的 crate（core/adapters/io/notifier）行覆盖率 ≥ **80%** | `cargo llvm-cov -p <crate> --summary-only` |
 | UT-03 | 新增/修改代码不得降低 workspace 覆盖率 | CI 或 merge 前全量跑 |
 | UT-04 | 仅 trait 定义/未接线代码须标注豁免或 2 周内补测计划 | 见下方豁免表 |
 | UT-05 | 每个 public API 至少 1 个正向 + 1 个错误/边界用例 | code review checklist |
@@ -103,7 +103,7 @@ E2E 覆盖率 = 已注册且通过的 E2E 场景数 / compatibility 矩阵（已
 ## 5. Merge 前 Checklist（摘要）
 
 - [ ] UT-01：`cargo test --workspace --all-features`
-- [ ] UT-01：`cargo llvm-cov --workspace --all-features --fail-under-lines 75`
+- [ ] UT-01：`cargo llvm-cov --workspace --all-features --fail-under-lines 80`
 - [ ] 相关 E2E 场景在 registry 中标记 **通过**
 - [ ] 性能变更已归档并更新 perf-registry
 - [ ] 模块测试报告已按 RPT-01 更新

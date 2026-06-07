@@ -1,0 +1,4 @@
+asc scan     allocs=     7  bytes=     9567  per_msg: 0.01 allocs, 10.4 bytes
+asc collect  allocs=   247  bytes=   170373  per_msg: 0.27 allocs, 185.4 bytes
+blf scan     allocs=    42  bytes=  1662523  per_msg: 0.00 allocs, 166.3 bytes
+blf collect  allocs=  1547  bytes=  4787411  per_msg: 0.15 allocs, 478.7 bytes

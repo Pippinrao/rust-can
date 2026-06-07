@@ -13,7 +13,14 @@ serde.workspace = true
 bytes.workspace = true
 nom.workspace = true
 flate2.workspace = true
+smallvec.workspace = true
 tracing.workspace = true
+
+[features]
+# Toggle on with `--features profile` to enable timing-based profiling
+# hooks in the ASC and BLF readers. The hooks are zero-cost when the
+# feature is off (they compile to `#[inline(always)] fn noop() {}`).
+profile = []
 
 [lints]
 workspace = true

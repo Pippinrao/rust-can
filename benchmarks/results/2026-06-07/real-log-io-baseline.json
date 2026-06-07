@@ -1,0 +1,97 @@
+{
+  "asc_limit": 100000,
+  "asc_runs": [
+    {
+      "classic": 148,
+      "fd": 771,
+      "lin": 0,
+      "messages": 919,
+      "messages_per_second": 3613841.918993315,
+      "seconds": 0.0002543
+    },
+    {
+      "classic": 148,
+      "fd": 771,
+      "lin": 0,
+      "messages": 919,
+      "messages_per_second": 5284646.348476136,
+      "seconds": 0.0001739
+    },
+    {
+      "classic": 148,
+      "fd": 771,
+      "lin": 0,
+      "messages": 919,
+      "messages_per_second": 4465500.48590865,
+      "seconds": 0.0002058
+    },
+    {
+      "classic": 148,
+      "fd": 771,
+      "lin": 0,
+      "messages": 919,
+      "messages_per_second": 5596833.130328867,
+      "seconds": 0.0001642
+    },
+    {
+      "classic": 148,
+      "fd": 771,
+      "lin": 0,
+      "messages": 919,
+      "messages_per_second": 5715174.129353234,
+      "seconds": 0.0001608
+    }
+  ],
+  "asc_source": "data/extracted/CDC_VHR_LZ4CCAN_PRTO-M183 5.0.0.60M(C00E11R1P4log)_20260529090831(+0800)_20260529091109(+0800)_26550(parsed)/CDC_VHR_LZ4CCAN_1_20260529090831_20260529090831(UTC+8)_26550.asc",
+  "blf_runs": [
+    {
+      "classic": 1486,
+      "fd": 8514,
+      "lin": 0,
+      "messages": 10000,
+      "messages_per_second": 9180207.472688882,
+      "seconds": 0.0010893
+    },
+    {
+      "classic": 1486,
+      "fd": 8514,
+      "lin": 0,
+      "messages": 10000,
+      "messages_per_second": 9952229.299363058,
+      "seconds": 0.0010048
+    },
+    {
+      "classic": 1486,
+      "fd": 8514,
+      "lin": 0,
+      "messages": 10000,
+      "messages_per_second": 9624639.076034648,
+      "seconds": 0.001039
+    },
+    {
+      "classic": 1486,
+      "fd": 8514,
+      "lin": 0,
+      "messages": 10000,
+      "messages_per_second": 9267840.593141798,
+      "seconds": 0.001079
+    },
+    {
+      "classic": 1486,
+      "fd": 8514,
+      "lin": 0,
+      "messages": 10000,
+      "messages_per_second": 10141987.829614606,
+      "seconds": 0.000986
+    }
+  ],
+  "blf_source": "data/generated/real_can_canfd_10000.blf",
+  "language": "rust",
+  "runs": 5,
+  "summary": {
+    "asc_mean_messages_per_second": 4935199.202612041,
+    "asc_min_messages_per_second": 3613841.918993315,
+    "blf_mean_messages_per_second": 9633380.8541686,
+    "blf_min_messages_per_second": 9180207.472688882
+  }
+}

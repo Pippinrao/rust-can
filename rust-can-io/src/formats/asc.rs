@@ -74,12 +74,21 @@ impl<R: BufRead> AscReader<R> {
 
     /// Collects up to `limit` decoded log events from the source.
     pub fn collect_events_limit(self, limit: usize) -> Result<Vec<LogEvent>, AscParseError> {
+        // Reuse a single `String` for the line buffer instead of
+        // allocating a fresh one per iteration through `BufRead::lines`.
+        // The same pattern is used by `scan_can_stats_limit` below.
         let mut events = Vec::new();
-        for line in self.reader.lines() {
+        let mut reader = self.reader;
+        let mut line = String::new();
+        loop {
+            line.clear();
+            if reader.read_line(&mut line)? == 0 {
+                break;
+            }
             if events.len() >= limit {
                 break;
             }
-            if let Some(event) = parse_line(&line?)? {
+            if let Some(event) = parse_line(&line)? {
                 events.push(event);
             }
         }
@@ -229,13 +238,19 @@ impl<W: Write> AscWriter<W> {
 
 /// Parses one ASC line into a log event.
 pub fn parse_line(line: &str) -> Result<Option<LogEvent>, AscParseError> {
+    #[cfg(feature = "profile")]
+    prof_scope!("asc::parse_line");
     let trimmed = line.trim();
     if trimmed.is_empty() || is_metadata_line_without_event(trimmed) {
         return Ok(None);
     }
 
-    let parts: Vec<&str> = trimmed.split_whitespace().collect();
-    let Some(timestamp) = parts.first() else {
+    // Stream the line as whitespace-separated tokens instead of
+    // collecting them into a `Vec`. Each per-line parts allocation
+    // (≈ 3 reallocations for 12+ tokens) is the second-largest
+    // alloc source after the `BufRead::lines()` string churn.
+    let mut parts = trimmed.split_whitespace();
+    let Some(timestamp) = parts.next() else {
         return Ok(None);
     };
 
@@ -243,25 +258,38 @@ pub fn parse_line(line: &str) -> Result<Option<LogEvent>, AscParseError> {
         return Ok(None);
     };
 
-    if parts.get(1) == Some(&"Start") {
+    let Some(second) = parts.next() else {
+        return Ok(None);
+    };
+
+    if second == "Start" {
         return Ok(None);
     }
 
-    if parts.get(1) == Some(&"CANFD") {
-        return parse_canfd(&parts, timestamp_ns).map(Some);
+    if second == "CANFD" {
+        return parse_canfd(parts, timestamp_ns).map(Some);
     }
 
-    if parts.get(1).is_some_and(|part| part.starts_with('L')) {
-        return parse_lin(&parts, timestamp_ns).map(Some);
+    if second.starts_with('L') {
+        return parse_lin(parts, second, timestamp_ns).map(Some);
     }
 
-    if parts.get(1).is_some_and(|part| part.chars().all(|ch| ch.is_ascii_digit()))
-        && parts.get(3).is_some_and(|part| matches!(*part, "Rx" | "Tx"))
-    {
-        return parse_classic_can(&parts, timestamp_ns).map(Some);
+    // Classic CAN: second token is the channel (decimal integer).
+    // The next two tokens are the arbitration id and the direction;
+    // we peek at the direction without consuming the iterator so the
+    // inner parser can re-iterate from the arbitration id onward.
+    if second.bytes().all(|byte| byte.is_ascii_digit()) {
+        let mut peek = parts.by_ref().peekable();
+        let Some(arbitration_id_str) = peek.next() else {
+            return Ok(None);
+        };
+        if peek.peek().is_some_and(|dir| matches!(*dir, "Rx" | "Tx")) {
+            return parse_classic_can(peek, second, arbitration_id_str, timestamp_ns)
+                .map(Some);
+        }
     }
 
-    let kind = parts.get(1).copied().unwrap_or("unknown").to_string();
+    let kind = second.to_string();
     Ok(Some(LogEvent::Unknown(UnknownEvent {
         timestamp_ns: Some(timestamp_ns),
         kind,
@@ -357,15 +385,25 @@ fn parse_asc_channel(token: &str) -> Result<Channel, AscParseError> {
     parse_decimal_u16("channel", token).map(|channel| Channel::Number(channel.saturating_sub(1)))
 }
 
-fn parse_payload(tokens: &[&str], len: usize) -> Result<Payload, AscParseError> {
-    let mut bytes = Vec::with_capacity(len);
-    for token in tokens.iter().take(len) {
+fn parse_payload<'a, I>(mut tokens: I, len: usize) -> Result<Payload, AscParseError>
+where
+    I: Iterator<Item = &'a str>,
+{
+    #[cfg(feature = "profile")]
+    prof_scope!("asc::parse_payload");
+    // `SmallVec<[u8; 8]>` keeps classical-CAN payloads (≤ 8 bytes)
+    // on the stack with no heap allocation. For longer payloads it
+    // spills to the heap.
+    let mut bytes: smallvec::SmallVec<[u8; 8]> =
+        smallvec::SmallVec::with_capacity(len);
+    for _ in 0..len {
+        let token = tokens.next().ok_or(AscParseError::MissingField("data"))?;
         bytes.push(parse_hex_byte("data", token)?);
     }
     if bytes.len() != len {
         return Err(AscParseError::MissingField("data"));
     }
-    Ok(Payload::from(bytes))
+    Ok(Payload::from_smallvec(bytes))
 }
 
 fn scan_can_stats_line(line: &str, stats: &mut AscCanStats) -> Result<(), AscParseError> {
@@ -486,18 +524,32 @@ fn scan_payload_tokens<'a>(
     Ok(())
 }
 
-fn parse_classic_can(parts: &[&str], timestamp_ns: i64) -> Result<LogEvent, AscParseError> {
-    let channel = parse_asc_channel(parts.get(1).ok_or(AscParseError::MissingField("channel"))?)?;
+fn parse_classic_can<'a, I>(
+    mut parts: I,
+    channel_str: &'a str,
+    arbitration_id_str: &'a str,
+    timestamp_ns: i64,
+) -> Result<LogEvent, AscParseError>
+where
+    I: Iterator<Item = &'a str>,
+{
+    #[cfg(feature = "profile")]
+    prof_scope!("asc::parse_classic_can");
+    let channel = parse_asc_channel(channel_str)?;
     let (arbitration_id, extended_id) =
-        parse_hex_u32("arbitration_id", parts.get(2).ok_or(AscParseError::MissingField("arbitration_id"))?)?;
-    let direction = parse_direction(parts.get(3).ok_or(AscParseError::MissingField("direction"))?)?;
-    let frame_kind = parts.get(4).ok_or(AscParseError::MissingField("frame kind"))?;
-    let dlc = parse_hex_byte("dlc", parts.get(5).ok_or(AscParseError::MissingField("dlc"))?)? as usize;
+        parse_hex_u32("arbitration_id", arbitration_id_str)?;
+    let direction = parse_direction(
+        parts.next().ok_or(AscParseError::MissingField("direction"))?,
+    )?;
+    let frame_kind = parts.next().ok_or(AscParseError::MissingField("frame kind"))?;
+    let dlc =
+        parse_hex_byte("dlc", parts.next().ok_or(AscParseError::MissingField("dlc"))?)?
+            as usize;
     let remote_frame = frame_kind.eq_ignore_ascii_case("r");
     let data = if remote_frame {
         Payload::default()
     } else {
-        parse_payload(parts.get(6..).unwrap_or_default(), dlc.min(8))?
+        parse_payload(parts, dlc.min(8))?
     };
 
     Ok(LogEvent::Can(CanLogEvent {
@@ -511,30 +563,39 @@ fn parse_classic_can(parts: &[&str], timestamp_ns: i64) -> Result<LogEvent, AscP
     }))
 }
 
-fn parse_canfd(parts: &[&str], timestamp_ns: i64) -> Result<LogEvent, AscParseError> {
-    let channel = parse_asc_channel(parts.get(2).ok_or(AscParseError::MissingField("channel"))?)?;
-    let (arbitration_id, extended_id) =
-        parse_hex_u32("arbitration_id", parts.get(3).ok_or(AscParseError::MissingField("arbitration_id"))?)?;
-    let direction = parse_direction(parts.get(4).ok_or(AscParseError::MissingField("direction"))?)?;
-    let bitrate_switch = parts.get(5).ok_or(AscParseError::MissingField("brs"))? == &"1";
-    let error_state_indicator = parts.get(6).ok_or(AscParseError::MissingField("esi"))? == &"1";
-    let dlc_code = parts
-        .get(8)
-        .ok_or(AscParseError::MissingField("dlc"))?
-        .parse::<u8>()
-        .map_err(|_| AscParseError::InvalidField {
-            field: "dlc",
-            value: parts[8].to_string(),
-        })?;
-    let data_len = parts
-        .get(9)
-        .ok_or(AscParseError::MissingField("data length"))?
+fn parse_canfd<'a, I>(mut parts: I, timestamp_ns: i64) -> Result<LogEvent, AscParseError>
+where
+    I: Iterator<Item = &'a str>,
+{
+    #[cfg(feature = "profile")]
+    prof_scope!("asc::parse_canfd");
+    let channel = parse_asc_channel(parts.next().ok_or(AscParseError::MissingField("channel"))?)?;
+    let (arbitration_id, extended_id) = parse_hex_u32(
+        "arbitration_id",
+        parts.next().ok_or(AscParseError::MissingField("arbitration_id"))?,
+    )?;
+    let direction =
+        parse_direction(parts.next().ok_or(AscParseError::MissingField("direction"))?)?;
+    let bitrate_switch_str = parts.next().ok_or(AscParseError::MissingField("brs"))?;
+    let error_state_indicator_str = parts.next().ok_or(AscParseError::MissingField("esi"))?;
+    // One token between `esi` and `dlc` is reserved (the frame-kind
+    // marker "d" carried over from the classic CAN line format).
+    let _ = parts.next();
+    let dlc_str = parts.next().ok_or(AscParseError::MissingField("dlc"))?;
+    let dlc_code = dlc_str.parse::<u8>().map_err(|_| AscParseError::InvalidField {
+        field: "dlc",
+        value: dlc_str.to_string(),
+    })?;
+    let data_len_str = parts
+        .next()
+        .ok_or(AscParseError::MissingField("data length"))?;
+    let data_len = data_len_str
         .parse::<usize>()
         .map_err(|_| AscParseError::InvalidField {
             field: "data length",
-            value: parts[9].to_string(),
+            value: data_len_str.to_string(),
         })?;
-    let data = parse_payload(parts.get(10..).unwrap_or_default(), data_len)?;
+    let data = parse_payload(parts, data_len)?;
 
     Ok(LogEvent::CanFd(CanFdLogEvent {
         timestamp_ns,
@@ -542,32 +603,48 @@ fn parse_canfd(parts: &[&str], timestamp_ns: i64) -> Result<LogEvent, AscParseEr
         arbitration_id,
         direction,
         extended_id,
-        bitrate_switch,
-        error_state_indicator,
+        bitrate_switch: bitrate_switch_str == "1",
+        error_state_indicator: error_state_indicator_str == "1",
         dlc_code,
         data,
     }))
 }
 
-fn parse_lin(parts: &[&str], timestamp_ns: i64) -> Result<LogEvent, AscParseError> {
-    let channel = parts.get(1).ok_or(AscParseError::MissingField("channel"))?.to_string();
-    let frame_id = parse_hex_byte("frame_id", parts.get(2).ok_or(AscParseError::MissingField("frame_id"))?)?;
-    let direction = parse_direction(parts.get(3).ok_or(AscParseError::MissingField("direction"))?)?;
-    let data_len = parts
-        .get(4)
-        .ok_or(AscParseError::MissingField("data length"))?
+fn parse_lin<'a, I>(mut parts: I, channel_str: &'a str, timestamp_ns: i64) -> Result<LogEvent, AscParseError>
+where
+    I: Iterator<Item = &'a str>,
+{
+    // `channel_str` is the L11/L* token from the line; the iterator
+    // resumes at the frame id.
+    let channel = channel_str.to_string();
+    let frame_id = parse_hex_byte(
+        "frame_id",
+        parts.next().ok_or(AscParseError::MissingField("frame_id"))?,
+    )?;
+    let direction =
+        parse_direction(parts.next().ok_or(AscParseError::MissingField("direction"))?)?;
+    let data_len_str = parts
+        .next()
+        .ok_or(AscParseError::MissingField("data length"))?;
+    let data_len = data_len_str
         .parse::<usize>()
         .map_err(|_| AscParseError::InvalidField {
             field: "data length",
-            value: parts[4].to_string(),
+            value: data_len_str.to_string(),
         })?;
-    let checksum_index = parts.iter().position(|part| *part == "checksum");
-    let data_end = checksum_index.unwrap_or(parts.len());
-    let data = parse_payload(parts.get(5..data_end).unwrap_or_default(), data_len)?;
+    // Collect remaining tokens: LIN frames optionally end with
+    // `checksum = XX`; the data is everything before that marker.
+    // LIN frames are rare, so a single small `Vec` is fine here.
+    let remaining: Vec<&str> = parts.collect();
+    let checksum_index = remaining.iter().position(|token| *token == "checksum");
+    let data_end = checksum_index.unwrap_or(remaining.len());
+    let data = parse_payload(remaining[..data_end].iter().copied(), data_len)?;
     let checksum = match checksum_index {
-        Some(index) => Some(parse_hex_byte(
+        Some(idx) => Some(parse_hex_byte(
             "checksum",
-            parts.get(index + 2).ok_or(AscParseError::MissingField("checksum"))?,
+            remaining
+                .get(idx + 2)
+                .ok_or(AscParseError::MissingField("checksum"))?,
         )?),
         None => None,
     };

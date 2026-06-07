@@ -1,0 +1,6 @@
+asc::parse_line 17873900
+asc::parse_line;asc::parse_canfd 9688100
+asc::parse_line;asc::parse_canfd;asc::parse_payload 3734200
+asc::parse_line;asc::parse_classic_can 1577600
+asc::parse_line;asc::parse_classic_can;asc::parse_payload 548100
+asc::parse_line;asc::parse_payload 93200

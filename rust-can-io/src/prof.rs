@@ -19,7 +19,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
 thread_local! {
@@ -32,22 +31,37 @@ static ENABLED: AtomicBool = AtomicBool::new(false);
 
 /// Globals keyed by the current call stack. We accumulate per-stack
 /// total time; the total for a given stack is what becomes one folded
-/// stack line at dump time. Initialized lazily on first access.
+/// stack line at dump time.
+///
+/// `STACK` and `ACCUM` are both per-thread (`thread_local!`).
+/// Otherwise, a parallel test that creates Scopes on another thread
+/// would interleave its measurements into this thread's `dump_folded`
+/// output, which makes the folded-stack files non-deterministic
+/// and the tests flaky. Per-thread isolation matches how
+/// sampling-based profilers (`flamegraph.pl`, `perf script`) treat
+/// each thread as a separate stack anyway.
 type AccKey = Vec<&'static str>;
 type AccValue = (Duration, u64);
 type AccMap = HashMap<AccKey, AccValue>;
-static ACCUM: LazyLock<Mutex<AccMap>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+
+thread_local! {
+    static ACCUM: std::cell::RefCell<AccMap> = std::cell::RefCell::new(HashMap::new());
+}
 
 /// Enable profiling for the current process. Idempotent.
 pub fn enable() {
-    ENABLED.store(true, Ordering::Relaxed);
+    // `SeqCst` so all other threads' subsequent `ENABLED` loads
+    // observe the new value. Combined with `Scope::new`'s
+    // `Acquire` load, this gives a clean happens-before relation
+    // between the enable() and the next push onto a thread's STACK.
+    ENABLED.store(true, Ordering::SeqCst);
 }
 
 /// Disable profiling for the current process. Mainly useful in tests
 /// to opt out of cross-test state leakage; production code never
 /// calls this.
 pub fn disable() {
-    ENABLED.store(false, Ordering::Relaxed);
+    ENABLED.store(false, Ordering::SeqCst);
 }
 
 /// Returns whether profiling is enabled.
@@ -59,11 +73,15 @@ pub fn is_enabled() -> bool {
 /// at the end.
 pub struct Scope {
     name: &'static str,
-    /// The instant this scope started. Held in the struct so that
-    /// `Drop` can compute `elapsed = now - started` without reaching
-    /// into the per-thread stack; this keeps the borrow short and
-    /// avoids an aliasing `RefMut` panic.
+    /// Instant this scope started measuring.
     started: Instant,
+    /// Snapshot of `ENABLED` taken at `Scope::new` time. We bind it
+    /// to the scope instead of re-reading the global atomic at
+    /// `Drop` time so the create/push and drop/pop decisions are
+    /// made under the same flag. Without this, another thread can
+    /// flip `ENABLED` between the two reads, desyncing the
+    /// thread-local stack from the scope's own lifetime.
+    enabled: bool,
 }
 
 impl Scope {
@@ -74,39 +92,47 @@ impl Scope {
     #[inline]
     pub fn new(name: &'static str) -> Self {
         let started = Instant::now();
-        if ENABLED.load(Ordering::Relaxed) {
+        // `Acquire` so a subsequent `disable()` on another thread is
+        // ordered after this load — in practice both `enable()` and
+        // `disable()` use `SeqCst`, but reading with the matching
+        // ordering makes the contract explicit.
+        let enabled = ENABLED.load(Ordering::Acquire);
+        if enabled {
             STACK.with(|s| s.borrow_mut().push(name));
         }
-        Self { name, started }
+        Self {
+            name,
+            started,
+            enabled,
+        }
     }
 }
 
 impl Drop for Scope {
     #[inline]
     fn drop(&mut self) {
-        if !ENABLED.load(Ordering::Relaxed) {
+        // Use the bound `enabled` flag, not the live atomic. See
+        // `Scope::new` for why.
+        if !self.enabled {
             return;
         }
         let now = Instant::now();
         let elapsed = now.duration_since(self.started);
 
-        // Take the stack snapshot inside the `with` closure so the
-        // `RefMut` borrow ends before we touch the global accumulator.
         let mut key: AccKey = Vec::new();
         STACK.with(|s| {
             let mut stack = s.borrow_mut();
             let popped = stack.pop();
-            // `popped` may not match `self.name` when `ENABLED` flipped
-            // mid-flight (another thread's test ran `enable()` or
-            // `disable()` while this scope was live). In that case
-            // the STACK reflects a different frame order than this
-            // scope was created in, and we have no way to
-            // reconstruct a meaningful folded-stack line. Drop the
-            // measurement rather than panic the test runner.
+            // `popped` should equal `Some(self.name)` because every
+            // push that we are now popping was done while
+            // `ENABLED == self.enabled`. If the test harness runs
+            // multiple tests on the same OS thread (cargo test
+            // recycles threads across tests) and a previous test
+            // enabled profiling, a residual frame on this thread's
+            // stack could be popped here. Recover by re-pushing
+            // and discarding the measurement.
             if popped != Some(self.name) {
                 if let Some(name) = popped {
-                    // Restore the popped frame so subsequent scopes
-                    // that *do* match it can still pair correctly.
                     stack.push(name);
                 }
                 return;
@@ -118,10 +144,12 @@ impl Drop for Scope {
         if key.is_empty() {
             return;
         }
-        let mut accum = ACCUM.lock().expect("prof ACCUM poisoned");
-        let entry = accum.entry(key).or_insert((Duration::ZERO, 0));
-        entry.0 += elapsed;
-        entry.1 += 1;
+        ACCUM.with(|accum| {
+            let mut accum = accum.borrow_mut();
+            let entry = accum.entry(key).or_insert((Duration::ZERO, 0));
+            entry.0 += elapsed;
+            entry.1 += 1;
+        });
     }
 }
 
@@ -130,17 +158,23 @@ impl Drop for Scope {
 /// Gregg's `flamegraph.pl` (one stack per line, semicolon-joined,
 /// space + sample weight in nanoseconds).
 pub fn dump_folded<W: Write>(out: &mut W) -> std::io::Result<()> {
-    let accum = ACCUM.lock().expect("prof ACCUM poisoned");
-    let mut entries: Vec<_> = accum.iter().collect();
-    entries.sort_by(|a, b| b.1 .0.cmp(&a.1 .0).then(b.1 .1.cmp(&a.1 .1)));
+    // Flush this thread's accumulator. Callers that want a full
+    // process-wide view must ensure all worker threads have stopped
+    // (and ideally called `dump_folded` on each of them) before
+    // invoking `dump_folded` on the main thread.
     let mut buf = String::new();
-    for (stack, (total, _count)) in entries {
-        let nanos = total.as_nanos() as u64;
-        buf.push_str(&stack.join(";"));
-        buf.push(' ');
-        buf.push_str(&nanos.to_string());
-        buf.push('\n');
-    }
+    ACCUM.with(|accum| {
+        let accum = accum.borrow();
+        let mut entries: Vec<_> = accum.iter().collect();
+        entries.sort_by(|a, b| b.1 .0.cmp(&a.1 .0).then(b.1 .1.cmp(&a.1 .1)));
+        for (stack, (total, _count)) in entries {
+            let nanos = total.as_nanos() as u64;
+            buf.push_str(&stack.join(";"));
+            buf.push(' ');
+            buf.push_str(&nanos.to_string());
+            buf.push('\n');
+        }
+    });
     out.write_all(buf.as_bytes())
 }
 
@@ -148,7 +182,7 @@ pub fn dump_folded<W: Write>(out: &mut W) -> std::io::Result<()> {
 /// once at the end of the profiled run.
 pub fn dump_and_reset<W: Write>(out: &mut W) -> std::io::Result<()> {
     dump_folded(out)?;
-    ACCUM.lock().expect("prof ACCUM poisoned").clear();
+    ACCUM.with(|accum| accum.borrow_mut().clear());
     Ok(())
 }
 
@@ -189,11 +223,20 @@ mod tests {
     /// Build a fresh scope without going through `enable` — every test
     /// sets `ENABLED` explicitly and resets the accumulator.
     struct EnableGuard {
+        // `unwrap_or_else` recovers from a prior panic's poison so
+        // a single failed test does not cascade into "lock poisoned"
+        // for every subsequent test.
         _lock: std::sync::MutexGuard<'static, ()>,
     }
     impl EnableGuard {
         fn new() -> Self {
-            let lock = TEST_LOCK.lock().expect("prof test lock poisoned");
+            let lock = TEST_LOCK.lock().unwrap_or_else(|err| {
+                // Clear the poison by recovering the inner guard;
+                // the poisoning state is irrelevant for serializing
+                // the ENABLED/ACCUM mutations this guard exists to
+                // protect.
+                err.into_inner()
+            });
             // Disable first so the order of test execution cannot
             // make the new test inherit a previous test's enabled
             // state. Also reset the per-thread stack: a previous test
@@ -325,12 +368,12 @@ mod tests {
     }
 
     #[test]
-    fn other_thread_scopes_appear_in_global_accumulator() {
-        // The thread-local STACK only protects in-flight `Drop`
-        // ordering. The accumulator itself is global, so scopes that
-        // finished on another thread do show up in this thread's
-        // snapshot. This documents that contract so a refactor does
-        // not silently change it.
+    fn other_thread_scope_does_not_pollute_this_thread() {
+        // The `STACK` and `ACCUM` are both thread-local. A scope
+        // created on a different thread must not appear in *this*
+        // thread's snapshot, and must not crash. This test exists
+        // to lock in the per-thread isolation contract so a future
+        // refactor to global state does not silently change it.
         let _g = EnableGuard::new();
         let h = thread::spawn(|| {
             let _s = Scope::new("from-other-thread");
@@ -338,7 +381,13 @@ mod tests {
         });
         h.join().expect("join");
         let snap = snapshot();
-        assert!(snap.contains("from-other-thread"));
+        assert!(!snap.contains("from-other-thread"));
+        // And our own scope still shows up.
+        {
+            let _s = Scope::new("here");
+        }
+        let snap = snapshot();
+        assert!(snap.contains("here"));
     }
 
     /// Round-trip the `Display` formatter on a sample error; the

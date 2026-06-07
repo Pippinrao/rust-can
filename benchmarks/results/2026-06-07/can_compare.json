@@ -1,0 +1,25 @@
+{
+  "language": "python",
+  "python_can_version": "4.6.1",
+  "runs": 5,
+  "asc": {
+    "source": "data\\extracted\\CDC_VHR_LZ4CCAN_PRTO-M183 5.0.0.60M(C00E11R1P4log)_20260529090831(+0800)_20260529091109(+0800)_26550(parsed)\\CDC_VHR_LZ4CCAN_1_20260529090831_20260529090831(UTC+8)_26550.asc",
+    "runs": 5,
+    "mean_seconds": 0.003291339986026287,
+    "min_seconds": 0.0032146000303328037,
+    "messages_per_run": 919,
+    "mean_messages_per_second": 279217.5842974917,
+    "max_messages_per_second": 285883.1553936298,
+    "peak_rss_kb": 36688
+  },
+  "blf": {
+    "source": "data\\generated\\real_can_canfd_10000.blf",
+    "runs": 5,
+    "mean_seconds": 0.017290119989775123,
+    "min_seconds": 0.017037900048308074,
+    "messages_per_run": 10000,
+    "mean_messages_per_second": 578364.9856631251,
+    "max_messages_per_second": 586926.790957025,
+    "peak_rss_kb": 37096
+  }
+}

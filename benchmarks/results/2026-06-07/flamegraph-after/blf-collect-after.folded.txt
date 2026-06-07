@@ -1,0 +1,9 @@
+blf::collect_events 335974600
+blf::collect_events;blf::parse_log_container 323907600
+blf::collect_events;blf::parse_log_container;blf::parse_container_with_tail 285172900
+blf::collect_events;blf::parse_log_container;blf::parse_container_with_tail;blf::parse_objects 278130200
+blf::collect_events;blf::parse_log_container;blf::parse_container_with_tail;blf::parse_objects;blf::parse_message_object 104913200
+blf::collect_events;blf::parse_log_container;blf::decompress_container 38508200
+blf::collect_events;blf::parse_log_container;blf::parse_container_with_tail;blf::parse_objects;blf::parse_object_header 12496000
+blf::collect_events;blf::parse_log_container;blf::parse_container_with_tail;blf::parse_objects;blf::parse_message_object;blf::parse_can_fd_message 12350600
+blf::collect_events;blf::parse_log_container;blf::parse_container_with_tail;blf::parse_objects;blf::parse_message_object;blf::parse_can_message 2098300

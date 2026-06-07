@@ -1,0 +1,43 @@
+{
+  "asc": {
+    "collect": {
+      "alloc_count": 5607,
+      "allocs_per_message": 6.101196953210011,
+      "bytes_allocated": 1108605,
+      "bytes_deallocated": 1108605,
+      "bytes_per_message": 1206.3166485310119,
+      "seconds": 0.0005984
+    },
+    "messages": 919,
+    "scan": {
+      "alloc_count": 7,
+      "bytes_allocated": 9567,
+      "bytes_deallocated": 9567,
+      "bytes_per_message": 10.410228509249183,
+      "seconds": 0.0002254
+    },
+    "source": "data\\extracted\\CDC_VHR_LZ4CCAN_PRTO-M183 5.0.0.60M(C00E11R1P4log)_20260529090831(+0800)_20260529091109(+0800)_26550(parsed)\\CDC_VHR_LZ4CCAN_1_20260529090831_20260529090831(UTC+8)_26550.asc"
+  },
+  "blf": {
+    "collect": {
+      "alloc_count": 10139,
+      "allocs_per_message": 1.0139,
+      "bytes_allocated": 6903507,
+      "bytes_deallocated": 6736741,
+      "bytes_per_message": 690.3507,
+      "events": 10000,
+      "seconds": 0.0023284
+    },
+    "messages": 10000,
+    "scan": {
+      "alloc_count": 42,
+      "bytes_allocated": 1662523,
+      "bytes_deallocated": 1662523,
+      "bytes_per_message": 166.2523,
+      "seconds": 0.0011541
+    },
+    "source": "data/generated/real_can_canfd_10000.blf"
+  },
+  "language": "rust",
+  "scenario": "PERF-IO-ALLOC-001"
+}

@@ -1,0 +1,5 @@
+blf::scan_can_stats 41037100
+blf::scan_can_stats;blf::scan_log_container 39322100
+blf::scan_can_stats;blf::scan_log_container;blf::decompress_container 32475100
+blf::scan_can_stats;blf::scan_log_container;blf::scan_container_with_tail 6687300
+blf::scan_can_stats;blf::scan_log_container;blf::scan_container_with_tail;blf::scan_objects 1225900

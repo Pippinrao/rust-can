@@ -46,6 +46,7 @@ crossterm = "0.28"
 bytes = "1"
 nom = "7"
 flate2 = "1"
+smallvec = { version = "1", default-features = false, features = ["union"] }
 
 # Concurrency
 crossbeam = "0.8"

@@ -90,6 +90,10 @@ impl From<io::Error> for BlfParseError {
 pub struct BlfReader<R> {
     reader: R,
     start_timestamp_nanos: TimestampNanos,
+    /// Object count declared in the BLF file header. `collect_events`
+    /// uses this to pre-allocate its `events` `Vec`, eliminating the
+    /// growth chain (14 reallocations for a 10 000-event file).
+    object_count: u32,
     tail: Vec<u8>,
     decompress_buf: Vec<u8>,
     body_buf: Vec<u8>,
@@ -258,9 +262,14 @@ impl<R: Read> BlfReader<R> {
         reader.read_exact(&mut remaining_header)?;
 
         let start_timestamp_nanos = systemtime_to_timestamp_nanos(&header[40..56]);
+        // object_count lives at offset 32..36 in the file header (see
+        // `write_file_header`). 0 is a valid value (empty file); we
+        // still keep it for downstream code that might want to know.
+        let object_count = read_u32(&header, 32)?;
         Ok(Self {
             reader,
             start_timestamp_nanos,
+            object_count,
             tail: Vec::new(),
             decompress_buf: Vec::new(),
             body_buf: Vec::new(),
@@ -284,7 +293,12 @@ impl<R: Read> BlfReader<R> {
 
     /// Read the remaining BLF stream into decoded log events.
     pub fn collect_events(&mut self) -> Result<Vec<LogEvent>, BlfParseError> {
-        let mut events = Vec::new();
+        #[cfg(feature = "profile")]
+        prof_scope!("blf::collect_events");
+        // Pre-allocate from the file-header object count. This is the
+        // exact upper bound on the number of LOBJ entries the reader
+        // will encounter; `events` will not need to reallocate.
+        let mut events = Vec::with_capacity(self.object_count as usize);
         loop {
             let mut base = [0_u8; OBJ_HEADER_BASE_SIZE];
             match self.reader.read_exact(&mut base) {
@@ -323,6 +337,8 @@ impl<R: Read> BlfReader<R> {
 
     /// Scan all CAN and CAN FD objects without allocating per-frame events.
     pub fn scan_can_stats(&mut self) -> Result<BlfCanStats, BlfParseError> {
+        #[cfg(feature = "profile")]
+        prof_scope!("blf::scan_can_stats");
         let mut stats = BlfCanStats::default();
         loop {
             let mut base = [0_u8; OBJ_HEADER_BASE_SIZE];
@@ -365,6 +381,8 @@ fn parse_log_container(
     tail: &mut Vec<u8>,
     decompress_buf: &mut Vec<u8>,
 ) -> Result<Vec<LogEvent>, BlfParseError> {
+    #[cfg(feature = "profile")]
+    prof_scope!("blf::parse_log_container");
     if body.len() < LOG_CONTAINER_STRUCT_SIZE {
         return Err(BlfParseError::Truncated {
             context: "log container",
@@ -394,6 +412,8 @@ fn scan_log_container(
     decompress_buf: &mut Vec<u8>,
     stats: &mut BlfCanStats,
 ) -> Result<(), BlfParseError> {
+    #[cfg(feature = "profile")]
+    prof_scope!("blf::scan_log_container");
     if body.len() < LOG_CONTAINER_STRUCT_SIZE {
         return Err(BlfParseError::Truncated {
             context: "log container",
@@ -420,6 +440,8 @@ fn scan_log_container(
 }
 
 fn decompress_container(body: &[u8], decompress_buf: &mut Vec<u8>) -> Result<(), BlfParseError> {
+    #[cfg(feature = "profile")]
+    prof_scope!("blf::decompress_container");
     let container_data = &body[LOG_CONTAINER_STRUCT_SIZE..];
     let uncompressed_size = read_u32(body, 8)? as usize;
     decompress_buf.clear();
@@ -442,6 +464,8 @@ fn parse_container_with_tail(
     start_timestamp_nanos: TimestampNanos,
     tail: &mut Vec<u8>,
 ) -> Result<Vec<LogEvent>, BlfParseError> {
+    #[cfg(feature = "profile")]
+    prof_scope!("blf::parse_container_with_tail");
     let mut buffer;
     let parse_data = if tail.is_empty() {
         data
@@ -464,6 +488,8 @@ fn scan_container_with_tail(
     tail: &mut Vec<u8>,
     stats: &mut BlfCanStats,
 ) -> Result<(), BlfParseError> {
+    #[cfg(feature = "profile")]
+    prof_scope!("blf::scan_container_with_tail");
     let mut buffer;
     let parse_data = if tail.is_empty() {
         data
@@ -507,14 +533,23 @@ fn parse_objects(
     data: &[u8],
     start_timestamp_nanos: TimestampNanos,
 ) -> Result<(Vec<LogEvent>, usize), BlfParseError> {
+    #[cfg(feature = "profile")]
+    prof_scope!("blf::parse_objects");
     let mut events = Vec::new();
     let mut offset = 0;
 
+    // Fast path: BLF data is a tight sequence of LOBJ-aligned objects
+    // with no inter-object padding. We can skip the 8-byte window
+    // scan in `find_lobj` for the common case and only fall back to
+    // it when the current offset is not at an LOBJ signature (e.g.
+    // tail bytes from a previous container).
     while offset + OBJ_HEADER_BASE_SIZE <= data.len() {
-        offset = match find_lobj(data, offset) {
-            Some(found) => found,
-            None => return Ok((events, offset)),
-        };
+        if data.get(offset..offset + 4) != Some(b"LOBJ") {
+            offset = match find_lobj(data, offset) {
+                Some(found) => found,
+                None => return Ok((events, offset)),
+            };
+        }
 
         let base = parse_base_header(slice_at(data, offset, OBJ_HEADER_BASE_SIZE, "object header")?)?;
         if offset + base.object_size > data.len() || offset + base.header_size > data.len() {
@@ -536,13 +571,17 @@ fn scan_objects(
     _start_timestamp_nanos: TimestampNanos,
     stats: &mut BlfCanStats,
 ) -> Result<usize, BlfParseError> {
+    #[cfg(feature = "profile")]
+    prof_scope!("blf::scan_objects");
     let mut offset = 0;
 
     while offset + OBJ_HEADER_BASE_SIZE <= data.len() {
-        offset = match find_lobj(data, offset) {
-            Some(found) => found,
-            None => return Ok(offset),
-        };
+        if data.get(offset..offset + 4) != Some(b"LOBJ") {
+            offset = match find_lobj(data, offset) {
+                Some(found) => found,
+                None => return Ok(offset),
+            };
+        }
 
         let base = parse_base_header(slice_at(data, offset, OBJ_HEADER_BASE_SIZE, "object header")?)?;
         if offset + base.object_size > data.len() || offset + base.header_size > data.len() {
@@ -648,6 +687,8 @@ fn parse_message_object(
     data: &[u8],
     header: &ObjectHeader,
 ) -> Result<Option<LogEvent>, BlfParseError> {
+    #[cfg(feature = "profile")]
+    prof_scope!("blf::parse_message_object");
     let payload = &data[header.payload_offset..header.next_offset];
     let event = match header.object_type {
         CAN_MESSAGE | CAN_MESSAGE2 => Some(parse_can_message(payload, header.timestamp_nanos)?),
@@ -659,6 +700,8 @@ fn parse_message_object(
 }
 
 fn parse_can_message(payload: &[u8], timestamp_nanos: TimestampNanos) -> Result<LogEvent, BlfParseError> {
+    #[cfg(feature = "profile")]
+    prof_scope!("blf::parse_can_message");
     if payload.len() < CAN_MSG_STRUCT_SIZE {
         return Err(BlfParseError::Truncated {
             context: "CAN message",
@@ -686,6 +729,8 @@ fn parse_can_fd_message(
     payload: &[u8],
     timestamp_nanos: TimestampNanos,
 ) -> Result<LogEvent, BlfParseError> {
+    #[cfg(feature = "profile")]
+    prof_scope!("blf::parse_can_fd_message");
     if payload.len() < CAN_FD_MSG_STRUCT_SIZE {
         return Err(BlfParseError::Truncated {
             context: "CAN FD message",
@@ -757,6 +802,8 @@ fn parse_object_header(
     offset: usize,
     start_timestamp_nanos: TimestampNanos,
 ) -> Result<ObjectHeader, BlfParseError> {
+    #[cfg(feature = "profile")]
+    prof_scope!("blf::parse_object_header");
     let base = parse_base_header(slice_at(data, offset, OBJ_HEADER_BASE_SIZE, "object header")?)?;
     let next_offset = offset + base.object_size;
     let header_start = offset + OBJ_HEADER_BASE_SIZE;
@@ -938,6 +985,8 @@ fn timestamp_to_nanos(flags: u32, timestamp: u64) -> TimestampNanos {
 }
 
 fn find_lobj(data: &[u8], offset: usize) -> Option<usize> {
+    #[cfg(feature = "profile")]
+    prof_scope!("blf::find_lobj");
     if data.get(offset..offset + 4) == Some(b"LOBJ") {
         return Some(offset);
     }

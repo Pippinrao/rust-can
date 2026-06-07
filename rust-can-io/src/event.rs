@@ -1,5 +1,7 @@
 //! Log-level events used by streaming readers and writers.
 
+use smallvec::SmallVec;
+
 /// Timestamp represented as nanoseconds from the log's time origin.
 pub type TimestampNanos = i64;
 
@@ -21,39 +23,89 @@ pub enum Channel {
     Named(String),
 }
 
+/// Inline capacity for the small-payload buffer in [`Payload`].
+///
+/// `8` covers every classical CAN frame (max DLC 8 bytes) and the vast
+/// majority of CAN FD frames; the smallvec spills to the heap on larger
+/// payloads. The constant is kept `pub` so downstream code can document
+/// the threshold in their own error messages if needed.
+pub const PAYLOAD_INLINE_CAPACITY: usize = 8;
+
 /// Owned payload bytes for log events.
+///
+/// The backing storage is a `SmallVec<[u8; 8]>`: up to eight bytes stay
+/// inline (no heap allocation), anything larger is heap-allocated.
+/// Classical CAN and most CAN FD frames therefore never touch the
+/// allocator.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Payload {
-    data: Vec<u8>,
+    data: SmallVec<[u8; PAYLOAD_INLINE_CAPACITY]>,
 }
 
 impl Payload {
     /// Copies bytes into an owned payload.
+    #[inline]
     pub fn from_slice(data: &[u8]) -> Self {
         Self {
-            data: data.to_vec(),
+            data: SmallVec::from_slice(data),
         }
     }
 
     /// Returns the payload as a byte slice.
+    #[inline]
     pub fn as_slice(&self) -> &[u8] {
         &self.data
     }
 
     /// Returns the payload length in bytes.
+    #[inline]
     pub fn len(&self) -> usize {
         self.data.len()
     }
 
     /// Returns true when the payload is empty.
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
+    }
+
+    /// True if the payload is stored on the stack (no heap allocation).
+    #[inline]
+    pub fn is_inline(&self) -> bool {
+        self.data.len() <= self.data.inline_size()
+    }
+
+    /// Consume the payload and return its bytes as a `Vec<u8>`. Useful
+    /// when handing the bytes to an API that requires owned storage.
+    #[inline]
+    pub fn into_bytes(self) -> SmallVec<[u8; PAYLOAD_INLINE_CAPACITY]> {
+        self.data
     }
 }
 
 impl From<Vec<u8>> for Payload {
+    #[inline]
     fn from(data: Vec<u8>) -> Self {
+        Self {
+            data: SmallVec::from_vec(data),
+        }
+    }
+}
+
+impl Payload {
+    /// Construct from a `SmallVec` already populated by the caller. Used
+    /// by hot paths in the ASC parser to skip a `Vec` round-trip when
+    /// the smallvec would never spill to the heap.
+    #[inline]
+    pub fn from_smallvec(data: SmallVec<[u8; PAYLOAD_INLINE_CAPACITY]>) -> Self {
         Self { data }
+    }
+}
+
+impl<'a> From<&'a [u8]> for Payload {
+    #[inline]
+    fn from(data: &'a [u8]) -> Self {
+        Self::from_slice(data)
     }
 }
 

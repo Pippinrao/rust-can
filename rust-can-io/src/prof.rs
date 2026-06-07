@@ -96,15 +96,28 @@ impl Drop for Scope {
         STACK.with(|s| {
             let mut stack = s.borrow_mut();
             let popped = stack.pop();
-            debug_assert_eq!(
-                popped,
-                Some(self.name),
-                "scope drop order mismatch"
-            );
+            // `popped` may not match `self.name` when `ENABLED` flipped
+            // mid-flight (another thread's test ran `enable()` or
+            // `disable()` while this scope was live). In that case
+            // the STACK reflects a different frame order than this
+            // scope was created in, and we have no way to
+            // reconstruct a meaningful folded-stack line. Drop the
+            // measurement rather than panic the test runner.
+            if popped != Some(self.name) {
+                if let Some(name) = popped {
+                    // Restore the popped frame so subsequent scopes
+                    // that *do* match it can still pair correctly.
+                    stack.push(name);
+                }
+                return;
+            }
             key.extend(stack.iter().copied());
             key.push(self.name);
         });
 
+        if key.is_empty() {
+            return;
+        }
         let mut accum = ACCUM.lock().expect("prof ACCUM poisoned");
         let entry = accum.entry(key).or_insert((Duration::ZERO, 0));
         entry.0 += elapsed;

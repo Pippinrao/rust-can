@@ -9,6 +9,13 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  # Force test serialisation. The `prof` feature introduces a
+  # process-wide `ENABLED` atomic that the BLF and ASC tests
+  # observe via the read path's `prof_scope!` markers; running
+  # the prof unit tests in parallel with the reader tests
+  # races on that flag and the assertion. One test at a time
+  # sidesteps the issue and is fast enough (≪ 30 s total).
+  RUST_TEST_THREADS: 1
 
 jobs:
   test:
@@ -33,7 +40,16 @@ jobs:
         run: cargo test -p rust-can-integration-tests --all-features
 
       - name: Run llvm-cov with 80% line gate
-        run: cargo llvm-cov --workspace --all-features --fail-under-lines 80
+        # `benchmarks/src/bin/*.rs` are developer-only profiling /
+        # performance tooling (reader_alloc_bench, reader_dhat,
+        # reader_profile_runner, real_log_io, perf_compare,
+        # virtual_perf_compare, alloc_bench, prepare_rust_blf).
+        # They are not library code; excluding them keeps the gate
+        # focused on production surfaces.
+        run: >-
+          cargo llvm-cov --workspace --all-features
+          --ignore-filename-regex 'benchmarks/src/bin/.*'
+          --fail-under-lines 80
 
       - name: Clippy (warnings denied)
         run: cargo clippy --workspace --all-features -- -D warnings

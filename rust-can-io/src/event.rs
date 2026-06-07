@@ -301,4 +301,54 @@ mod tests {
             _ => panic!("expected unknown event"),
         }
     }
+
+    #[test]
+    fn payload_inlines_up_to_eight_bytes() {
+        // Classical CAN (≤8 bytes) stays on the stack with no
+        // heap allocation; `is_inline` reports true.
+        let p = Payload::from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
+        assert_eq!(p.as_slice(), &[1, 2, 3, 4, 5, 6, 7, 8]);
+        assert_eq!(p.len(), 8);
+        assert!(!p.is_empty());
+        assert!(p.is_inline());
+    }
+
+    #[test]
+    fn payload_spills_to_heap_above_eight_bytes() {
+        let p = Payload::from_slice(&[0u8; 64]);
+        assert_eq!(p.len(), 64);
+        assert!(!p.is_inline());
+        // `into_bytes` returns the underlying SmallVec; the
+        // surrounding `Payload` is dropped at end of test, so the
+        // owned bytes are reclaimed cleanly.
+        let bytes = p.into_bytes();
+        assert_eq!(bytes.len(), 64);
+    }
+
+    #[test]
+    fn empty_payload_reports_empty() {
+        let p = Payload::from_slice(&[]);
+        assert!(p.is_empty());
+        // `from_slice` of an empty slice still keeps the inline
+        // storage with zero length, so `is_inline` is true.
+        assert!(p.is_inline());
+        assert_eq!(p.len(), 0);
+    }
+
+    #[test]
+    fn payload_from_vec_uses_smallvec_storage() {
+        let v: Vec<u8> = vec![1, 2, 3];
+        let p = Payload::from(v);
+        assert_eq!(p.as_slice(), &[1, 2, 3]);
+        assert!(p.is_inline());
+    }
+
+    #[test]
+    fn channel_named_carries_string() {
+        let ch = Channel::Named("L11".to_string());
+        match ch {
+            Channel::Named(s) => assert_eq!(s, "L11"),
+            _ => panic!("expected Named"),
+        }
+    }
 }

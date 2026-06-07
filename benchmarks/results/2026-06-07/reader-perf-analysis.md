@@ -296,3 +296,37 @@ SVG 火焰图在 `target/flamegraph/`：
 | BLF msgs/s | 9.68M | **10.09M** |
 
 零 `unsafe`，零公开 API 变更（`Payload` 公开方法签名保持，`parse_line` 公开签名保持，`BlfReader` 新增 `object_count` 是新增字段不破坏现有 API），改动约 **+350 行 -71 行** 集中在 `rust-can-io/src/{event,formats/asc,formats/blf}.rs`。
+
+---
+
+## 8. python-can 对比
+
+使用 `benchmarks/python/can_compare.py` 在同一真实语料上对比 python-can 4.6.1：
+
+**ASC**：919 条 CAN / CAN FD 事件（26 条 LIN 已过滤，python-can 无法解析 LIN 帧）
+**BLF**：10 000 条事件（ZLIB 压缩容器）
+
+### 8.1 Throughput
+
+| 格式 | python-can 4.6.1 (msgs/s) | rust-can (msgs/s) | 倍速 |
+|---|---:|---:|---:|
+| ASC | 279 218 | 5 630 331 | **20.2×** |
+| BLF | 578 365 | 10 086 120 | **17.4×** |
+
+rust-can 的 ASC / BLF 数据来自 §7.2 优化后的 `scan_can_stats(_limit)` 路径（均为 5 runs mean）。python-can 使用 `ASCReader` / `BLFReader` 完整解析。
+
+### 8.2 内存
+
+| 格式 | python-can 4.6.1 peak RSS | rust-can dhat peak heap |
+|---|---:|---:|
+| ASC | 36 688 KB (35.8 MB) | ~291 KB |
+| BLF | 37 096 KB (36.2 MB) | ~291 KB |
+
+python-can peak RSS 为 Windows `GetProcessMemoryInfo` 的 `PeakWorkingSetSize`。rust-can dhat 数据来自 §2 峰值内存画像。**rust-can 内存占用约为 python-can 的 1/126**。
+
+### 8.3 说明
+
+- python-can 4.6.1 的 `ASCReader` 无法解析 LIN 帧（`L11 1 Rx 8 …` 被误认为 CAN ID）。对比前已将 LIN 行从 ASC 文件中移除，确保双方解析的是同一组 CAN / CAN FD 事件（919 条）。
+- python-can 4.6.1 的 CAN FD 解析器假设 token 顺序 `channel direction arb_id`，但语料使用 `channel arb_id direction`。`can_compare.py` 在预处理阶段交换 3/4 号 token 以适配 python-can 的解析预期。
+- 以上倍速为**单线程**对比。rust-can 的 reader 本身是单线程的；python-can 同理。
+- python-can benchmark 脚本输出 JSON 保存在 `benchmarks/results/2026-06-07/can_compare.json`。

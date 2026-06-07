@@ -9,13 +9,6 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
-  # Force test serialisation. The `prof` feature introduces a
-  # process-wide `ENABLED` atomic that the BLF and ASC tests
-  # observe via the read path's `prof_scope!` markers; running
-  # the prof unit tests in parallel with the reader tests
-  # races on that flag and the assertion. One test at a time
-  # sidesteps the issue and is fast enough (≪ 30 s total).
-  RUST_TEST_THREADS: 1
 
 jobs:
   test:
